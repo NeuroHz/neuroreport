@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NeuroReport">
+<meta name="theme-color" content="#5B8DEF">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>NeuroReport</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0F1117;overflow-y:scroll;-webkit-overflow-scrolling:touch}
+select,input,textarea,button{font-family:inherit}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+import { h, render } from 'https://esm.sh/preact@10.19.3';
+import { useState, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
+import htm from 'https://esm.sh/htm@3.1.1';
+
+const html = htm.bind(h);
+
+const ACNS = {
+sex: [“Male”, “Female”, “Other”, “Unknown”],
+pdrFrequency: [“No discernible PDR”,“4 Hz \u2014 Theta”,“5 Hz \u2014 Theta”,“6 Hz \u2014 Theta”,“7 Hz \u2014 Theta”,“8 Hz \u2014 Alpha”,“8.5 Hz \u2014 Alpha”,“9 Hz \u2014 Alpha”,“9.5 Hz \u2014 Alpha”,“10 Hz \u2014 Alpha”,“10.5 Hz \u2014 Alpha”,“11 Hz \u2014 Alpha”,“12 Hz \u2014 Alpha”,“13 Hz \u2014 Alpha / Beta border”],
+voltage: [“Low (<20 \u00B5V)”, “Medium (20-70 \u00B5V)”, “High (>70 \u00B5V)”],
+symmetry: [“Symmetric”, “Asymmetric - higher amplitude left”, “Asymmetric - higher amplitude right”],
+reactivity: [“Reactive”, “Not reactive”, “Not tested”],
+apReactivity: [“Present and symmetric”, “Present and asymmetric”, “Absent”],
+continuity: [“Continuous”, “Nearly continuous”, “Discontinuous”, “Burst-suppression”, “Burst-attenuation”, “Suppression (<10 \u00B5V)”, “Electrocerebral inactivity”],
+sleepArch: [“Normal sleep transients present”, “Abnormal sleep architecture”, “Sleep spindles present”, “K-complexes present”, “Vertex waves present”, “REM sleep captured”],
+epiMorph: [“Spikes”, “Sharp waves”, “Spike-and-wave”, “Polyspike”, “Polyspike-and-wave”, “Sharp-and-slow-wave”],
+epiLoc: [“Fp1”,“Fp2”,“F3”,“F4”,“C3”,“C4”,“P3”,“P4”,“O1”,“O2”,“F7”,“F8”,“T3/T7”,“T4/T8”,“T5/P7”,“T6/P8”,“Fz”,“Cz”,“Pz”,“Left frontal”,“Right frontal”,“Left temporal”,“Right temporal”,“Left parietal”,“Right parietal”,“Left occipital”,“Right occipital”,“Left frontotemporal”,“Right frontotemporal”,“Left centrotemporal”,“Right centrotemporal”,“Left posterior temporal”,“Right posterior temporal”,“Bifrontal”,“Bitemporal”,“Generalized”,“Multifocal”],
+epiFreq: [“Rare (<1/hr)”, “Occasional (1/hr to <1/min)”, “Frequent (\u22651/min to <1/10s)”, “Abundant (\u22651/10s)”, “Very abundant (nearly continuous)”],
+epiDist: [“Focal”, “Multifocal”, “Generalized”, “Lateralized”, “Bilateral independent”],
+periodicPat: [“None”,“GPDs (Generalized Periodic Discharges)”,“LPDs (Lateralized Periodic Discharges)”,“BIPDs (Bilateral Independent Periodic Discharges)”,“SIRPIDS (Stimulus-Induced Rhythmic, Periodic, or Ictal Discharges)”],
+periodicFreq: [”<0.5 Hz”,“0.5-1 Hz”,“1-2 Hz”,“2-3 Hz”,”>3 Hz”],
+periodicMod: [“None”,”+R (with rhythmic activity)”,”+F (with fast activity)”,”+S (with sharp component)”,”+FR (with fast and rhythmic)”],
+rhythmicPat: [“None”,“GRDA (Generalized Rhythmic Delta Activity)”,“LRDA (Lateralized Rhythmic Delta Activity)”,“FIRDA”,“TIRDA”,“OIRDA”],
+focalSlow: [“None”,“Intermittent focal slowing”,“Continuous focal slowing”,“Polymorphic delta activity”,“Intermittent rhythmic delta activity”],
+slowLoc: [“Left frontal”,“Right frontal”,“Left temporal”,“Right temporal”,“Left parietal”,“Right parietal”,“Left occipital”,“Right occipital”,“Left hemisphere”,“Right hemisphere”,“Bifrontal”,“Bitemporal”,“Generalized”],
+genSlow: [“None”,“Mild generalized slowing”,“Moderate generalized slowing”,“Severe generalized slowing”,“Diffuse background attenuation”],
+hvResp: [“Not performed”,“No change”,“Symmetric slowing”,“Asymmetric slowing”,“Provoked epileptiform discharges”,“Provoked seizure”],
+ipsResp: [“Not performed”,“No photic driving”,“Symmetric photic driving”,“Asymmetric photic driving”,“Photoparoxysmal response”,“Photomyogenic response”],
+szType: [”\u2014 FOCAL ONSET \u2014”,“Focal onset - aware”,“Focal onset - impaired awareness”,“Focal onset - awareness unknown”,“Focal to bilateral tonic-clonic”,”\u2014 Focal Motor \u2014”,“Focal motor - automatisms”,“Focal motor - atonic”,“Focal motor - clonic”,“Focal motor - epileptic spasms”,“Focal motor - hyperkinetic”,“Focal motor - myoclonic”,“Focal motor - tonic”,”\u2014 Focal Non-Motor \u2014”,“Focal non-motor - autonomic”,“Focal non-motor - behavior arrest”,“Focal non-motor - cognitive”,“Focal non-motor - emotional”,“Focal non-motor - sensory”,”\u2014 GENERALIZED ONSET \u2014”,“Generalized motor - tonic-clonic”,“Generalized motor - tonic”,“Generalized motor - clonic”,“Generalized motor - myoclonic”,“Generalized motor - myoclonic-tonic-clonic”,“Generalized motor - myoclonic-atonic”,“Generalized motor - atonic”,“Generalized motor - epileptic spasms”,”\u2014 Generalized Non-Motor (Absence) \u2014”,“Generalized non-motor - typical absence”,“Generalized non-motor - atypical absence”,“Generalized non-motor - myoclonic absence”,“Generalized non-motor - eyelid myoclonia”,”\u2014 UNKNOWN ONSET \u2014”,“Unknown onset - motor - tonic-clonic”,“Unknown onset - motor - epileptic spasms”,“Unknown onset - non-motor - behavior arrest”,“Unknown onset”,”\u2014 OTHER \u2014”,“Electrographic only (subclinical)”,“Status epilepticus - focal”,“Status epilepticus - generalized convulsive”,“Status epilepticus - generalized non-convulsive”,“Status epilepticus - unknown”,“Unclassified”],
+szSem: [“No clinical correlate (subclinical)”,“Behavioral arrest”,“Automatisms - oroalimentary”,“Automatisms - manual/gestural”,“Automatisms - leg pedaling/bicycling”,“Automatisms - perseverative”,“Automatisms - hyperkinetic”,“Tonic posturing - unilateral”,“Tonic posturing - bilateral”,“Tonic posturing - figure of 4”,“Clonic movements - focal”,“Clonic movements - bilateral”,“Tonic-clonic”,“Myoclonic jerks - focal”,“Myoclonic jerks - generalized”,“Atonic / drop attack”,“Epileptic spasms”,“Versive - head”,“Versive - eye”,“Aphasia / speech arrest”,“Autonomic - ictal tachycardia”,“Autonomic - ictal bradycardia”,“Autonomic - apnea”,“Autonomic - emesis”,“Autonomic - piloerection”,“Sensory - somatosensory”,“Sensory - visual”,“Sensory - auditory”,“Sensory - olfactory/gustatory”,“Emotional - fear/anxiety”,“Emotional - laughing (gelastic)”,“Emotional - crying (dacrystic)”,“Cognitive - deja vu / jamais vu”,“Cognitive - hallucinations”,“Cognitive - forced thinking”,“Aura only”,“Other”],
+szOnset: [“Left frontal”,“Right frontal”,“Left temporal”,“Right temporal”,“Left parietal”,“Right parietal”,“Left occipital”,“Right occipital”,“Left frontotemporal”,“Right frontotemporal”,“Left centrotemporal”,“Right centrotemporal”,“Left posterior temporal”,“Right posterior temporal”,“Left frontoparietal”,“Right frontoparietal”,“Left temporo-occipital”,“Right temporo-occipital”,“Left hemisphere (diffuse)”,“Right hemisphere (diffuse)”,“Bilateral frontal”,“Bilateral temporal”,“Generalized”,“Diffuse”,“Midline (vertex/Cz)”,“Obscured by artifact”,“Unable to determine”],
+szEvol: [“Not applicable”,“Remained focal”,“Focal to bilateral (secondary generalization)”,“Evolved in frequency”,“Evolved in distribution”,“Evolved in morphology”,“Fluctuating”,“Static”],
+szEnd: [“Abrupt cessation”,“Gradual offset”,“Post-ictal suppression - focal”,“Post-ictal suppression - generalized”,“Post-ictal slowing - focal”,“Post-ictal slowing - generalized”,“Terminated with intervention (medication)”,“Terminated with stimulation”,“Unclear offset”],
+szDur: [”<10 seconds”,“10-30 seconds”,“30-60 seconds”,“1-2 minutes”,“2-5 minutes”,“5-10 minutes”,”>10 minutes”,“Continuous (status epilepticus)”],
+szEEG: [“Rhythmic theta activity”,“Rhythmic delta activity”,“Rhythmic alpha activity”,“Rhythmic beta activity”,“Spike-and-wave”,“Polyspike-and-wave”,“Low voltage fast activity”,“Electrodecremental pattern”,“Repetitive sharp waves”,“Repetitive spikes”,“Generalized paroxysmal fast activity (GPFA)”,“Hypsarrhythmia with electrodecrement”,“Other”],
+abnType: [“Epileptiform discharges”,“Electrographic seizures”,“Focal slowing”,“Generalized slowing”,“Periodic discharges”,“Rhythmic delta activity”,“Background asymmetry”,“Burst suppression”,“Electrocerebral inactivity”,“Excess beta activity”,“Breach rhythm”],
+patState: [“Awake”,“Drowsy”,“Asleep”,“Obtunded”,“Comatose”,“Sedated”,“Pharmacologically paralyzed”,“Post-ictal”],
+meds: [“None documented”,“Levetiracetam”,“Phenytoin/Fosphenytoin”,“Lacosamide”,“Valproic acid”,“Carbamazepine”,“Oxcarbazepine”,“Lamotrigine”,“Topiramate”,“Zonisamide”,“Phenobarbital”,“Midazolam drip”,“Propofol drip”,“Pentobarbital drip”,“Ketamine drip”,“Lorazepam”,“Diazepam”,“Clobazam”,“Brivaracetam”,“Perampanel”,“Cenobamate”,“Cannabidiol”,“Other”],
+actProc: [“Hyperventilation”,“Intermittent photic stimulation”,“Sleep deprivation”,“None performed”],
+recDur: [“20 minutes”,“30 minutes”,“40 minutes”,“60 minutes”,“2 hours”,“4 hours”,“8 hours”,“12 hours”,“24 hours”,“48 hours”,“72 hours”,“5 days”,“7 days”,“Other”],
+};
+
+const C = {bg:”#0F1117”,srf:”#181B25”,sAlt:”#1E2231”,brd:”#2A2F3F”,acc:”#5B8DEF”,aDim:“rgba(91,141,239,0.12)”,txt:”#E8EAF0”,tSec:”#8B90A0”,tMut:”#5A5F72”,ok:”#4ADE80”,warn:”#FBBF24”,err:”#F87171”,sBg:”#141720”};
+
+function Fld({label, children}) {
+return html`<div style=${{marginBottom:14}}><label style=${{display:"block",fontSize:12,fontWeight:500,color:C.tSec,marginBottom:5}}>${label}</label>${children}</div>`;
+}
+
+function Sel({value, onChange, options, placeholder}) {
+return html`<select style=${{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid "+C.brd,background:C.sAlt,color:C.txt,fontSize:13,outline:"none"}} value=${value||""} onChange=${e=>onChange(e.target.value)}> <option value="" disabled>${placeholder||"Select..."}</option> ${options.map(o => { const isG = o.startsWith("\u2014"); return html`<option key=${o} value=${o} disabled=${isG} style=${isG?{fontWeight:700,color:C.acc}:{}}>${o}</option>`; })} </select>`;
+}
+
+function MSelect({selected=[], onChange, options}) {
+return html`<div style=${{display:"flex",flexWrap:"wrap",gap:6}}> ${options.map(o => html`<span key=${o} style=${{padding:“5px 12px”,borderRadius:16,border:“1px solid “+(selected.includes(o)?C.acc:C.brd),cursor:“pointer”,fontSize:12,fontWeight:selected.includes(o)?600:400,background:selected.includes(o)?C.aDim:“transparent”,color:selected.includes(o)?C.acc:C.tSec,whiteSpace:“nowrap”}} onClick=${()=>onChange(selected.includes(o)?selected.filter(s=>s!==o):[…selected,o])}>${o}</span>`)}
+
+  </div>`;
+}
+
+function Sec({title, badge, children, defaultOpen=false}) {
+const [open, setOpen] = useState(defaultOpen);
+return html`<div style=${{background:C.srf,borderRadius:12,border:"1px solid "+C.brd,marginBottom:16,overflow:"hidden"}}> <div style=${{padding:"14px 20px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",background:open?C.sBg:"transparent",userSelect:"none"}} onClick=${()=>setOpen(!open)}> <div style=${{fontSize:14,fontWeight:600,display:"flex",alignItems:"center",gap:8}}> <span>${open?"\u25BE":"\u25B8"}</span>${title}${badge&&html`<span style=${{fontSize:10,padding:“2px 8px”,borderRadius:10,background:C.aDim,color:C.acc,fontWeight:600}}>${badge}</span>`} </div> </div> ${open && html`<div style=${{padding:“16px 20px”,borderTop:“1px solid “+C.brd}}>${children}</div>`}
+
+  </div>`;
+}
+
+function ImgAttach({images=[], onChange, label}) {
+const fRef = useRef();
+const [lb, setLb] = useState(null);
+const add = (files) => {
+Array.from(files).forEach(f => {
+if (!f.type.startsWith(“image/”)) return;
+const r = new FileReader();
+r.onload = (e) => onChange([…images, {src:e.target.result, name:f.name, caption:””}]);
+r.readAsDataURL(f);
+});
+};
+return html`<div style=${{marginTop:10}}> <label style=${{display:"block",fontSize:11,fontWeight:500,color:C.tMut,marginBottom:5}}>${label||"EEG Screenshots"}</label> <div style=${{border:"2px dashed #3A3F52",borderRadius:10,padding:"12px 16px",display:"flex",flexDirection:"column",alignItems:"center",gap:8,cursor:"pointer",background:"rgba(91,141,239,0.04)",minHeight:60,justifyContent:"center"}} onClick=${()=>fRef.current?.click()} onDrop=${e=>{e.preventDefault();if(e.dataTransfer.files?.length)add(e.dataTransfer.files)}} onDragOver=${e=>{e.preventDefault()}} onPaste=${e=>{const items=e.clipboardData?.items;if(!items)return;const imgs=[];for(let i=0;i<items.length;i++)if(items[i].type.startsWith("image/"))imgs.push(items[i].getAsFile());if(imgs.length){e.preventDefault();add(imgs)}}} tabIndex=${0}> <input ref=${fRef} type="file" accept="image/*" multiple style=${{display:"none"}} onChange=${e=>{add(e.target.files);e.target.value=""}} /> <span style=${{fontSize:20}}>\uD83D\uDCF7</span> <span style=${{fontSize:12,color:C.tSec}}>Click to upload, drag & drop, or <strong style=${{color:C.acc}}>paste (Ctrl+V)</strong></span> </div> ${images.length>0 && html`<div style=${{display:“flex”,flexWrap:“wrap”,gap:8,marginTop:8}}>
+${images.map((img,idx)=>html`<div key=${idx} style=${{position:"relative",display:"inline-flex",flexDirection:"column",gap:4}}> <img src=${img.src} style=${{width:120,height:90,objectFit:"cover",borderRadius:6,border:"1px solid "+C.brd,cursor:"pointer"}} onClick=${()=>setLb(img.src)} /> <input style=${{width:120,fontSize:10,padding:"3px 6px",borderRadius:6,border:"1px solid "+C.brd,background:C.sAlt,color:C.txt,outline:"none"}} placeholder="Caption..." value=${img.caption} onChange=${e=>{const u=[...images];u[idx]={...u[idx],caption:e.target.value};onChange(u)}} /> <button style=${{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:9,background:C.err,color:"#fff",border:"none",cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}} onClick=${()=>onChange(images.filter((_,i)=>i!==idx))}>\u2715</button> </div>`)}
+</div>`} ${lb && html`<div style=${{position:“fixed”,top:0,left:0,right:0,bottom:0,background:“rgba(0,0,0,0.85)”,display:“flex”,alignItems:“center”,justifyContent:“center”,zIndex:9999,cursor:“zoom-out”}} onClick=${()=>setLb(null)}><img src=${lb} style=${{maxWidth:“90vw”,maxHeight:“90vh”,borderRadius:8}} /></div>`}
+
+  </div>`;
+}
+
+const defReport = () => ({
+type:“routine”,
+patient:{name:””,mrn:””,dob:””,sex:””,referringPhysician:””,indication:””,relevantHistory:””},
+technical:{duration:””,medications:[],activationProcedures:[],techComments:””},
+background:{pdr:””,voltage:””,symmetry:””,reactivity:””,continuity:“Continuous”,apReactivity:””,images:[]},
+sleep:{captured:“no”,features:[]},
+activations:{hv:“Not performed”,ips:“Not performed”},
+epileptiform:{present:“no”,discharges:[],images:[]},
+periodic:{pattern:“None”,frequency:””,modifier:“None”,location:””,images:[]},
+rhythmic:{pattern:“None”,location:””},
+focalSlowing:{type:“None”,location:””,images:[]},
+generalizedSlowing:{type:“None”},
+seizures:{present:“no”,events:[],images:[]},
+icuDetails:{patientState:””,sedation:””,stimTesting:””,trendSummary:””},
+impression:{classification:””,abnormalities:[],clinicalCorrelation:””,additionalComments:””},
+});
+
+function genNarr(r) {
+const L = [];
+const tp = r.type===“routine”?“ROUTINE EEG REPORT”:r.type===“ltm”?“LONG-TERM MONITORING / EMU REPORT”:“ICU CONTINUOUS EEG MONITORING REPORT”;
+L.push(”[”+tp+”]\n”);
+if (r.patient.name||r.patient.mrn) {
+let p = “Patient: “+(r.patient.name||”***”);
+if(r.patient.sex)p+=” | Sex: “+r.patient.sex;
+if(r.patient.mrn)p+=” | MRN: “+r.patient.mrn;
+if(r.patient.dob)p+=” | DOB: “+r.patient.dob;
+L.push(p);
+if(r.patient.referringPhysician)L.push(“Referring Physician: “+r.patient.referringPhysician);
+if(r.patient.indication)L.push(“Indication: “+r.patient.indication);
+L.push(””);
+}
+L.push(“TECHNICAL DESCRIPTION:”);
+const t2=[];
+if(r.technical.duration)t2.push(“Recording duration: “+r.technical.duration+”.”);
+if(r.technical.activationProcedures?.length)t2.push(“Activation procedures: “+r.technical.activationProcedures.join(”, “)+”.”);
+if(r.technical.medications?.length)t2.push(“Current medications: “+r.technical.medications.join(”, “)+”.”);
+if(r.technical.techComments)t2.push(r.technical.techComments);
+L.push(t2.join(” “)||“No technical details recorded.”);L.push(””);
+if(r.type===“icu”){L.push(“PATIENT STATE:”);const ic=[];if(r.icuDetails.patientState)ic.push(“Patient state: “+r.icuDetails.patientState+”.”);if(r.icuDetails.sedation)ic.push(“Sedation: “+r.icuDetails.sedation+”.”);if(r.icuDetails.stimTesting)ic.push(“Stimulation testing: “+r.icuDetails.stimTesting+”.”);L.push(ic.join(” “)||“Not documented.”);L.push(””);}
+L.push(“BACKGROUND:”);
+const bg=[];
+if(r.background.pdr&&r.background.pdr!==“No discernible PDR”){const pc=r.background.pdr.split(” \u2014 “)[0];bg.push(“The posterior dominant rhythm consists of “+pc+” activity”);if(r.background.voltage)bg.push(”, “+r.background.voltage.toLowerCase()+” in amplitude”);if(r.background.symmetry)bg.push(”, “+r.background.symmetry.toLowerCase());if(r.background.reactivity)bg.push(”, and “+r.background.reactivity.toLowerCase()+” to eye opening”);bg.push(”.”);}else if(r.background.pdr===“No discernible PDR”)bg.push(“No discernible posterior dominant rhythm is identified.”);
+if(r.background.continuity&&r.background.continuity!==“Continuous”)bg.push(” The background is “+r.background.continuity.toLowerCase()+”.”);else if(r.background.continuity===“Continuous”)bg.push(” The background is continuous.”);
+if(r.background.apReactivity&&r.background.apReactivity!==“Present and symmetric”)bg.push(” Anterior-posterior gradient is “+r.background.apReactivity.toLowerCase()+”.”);
+L.push(bg.join(””)||“Background not described.”);if(r.background.images?.length)L.push(”  [”+r.background.images.length+” EEG screenshot(s) attached]”);L.push(””);
+if(r.sleep.captured===“yes”){L.push(“SLEEP:”);L.push(r.sleep.features?.length?r.sleep.features.join(”. “)+”.”:“Sleep captured, no features documented.”);L.push(””);}
+if(r.type===“routine”){L.push(“ACTIVATION PROCEDURES:”);const a=[];a.push(r.activations.hv!==“Not performed”?“Hyperventilation: “+r.activations.hv+”.”:“Hyperventilation was not performed.”);a.push(r.activations.ips!==“Not performed”?“Intermittent photic stimulation: “+r.activations.ips+”.”:“Intermittent photic stimulation was not performed.”);L.push(a.join(” “));L.push(””);}
+L.push(“EPILEPTIFORM ACTIVITY:”);
+if(r.epileptiform.present===“yes”&&r.epileptiform.discharges?.length){r.epileptiform.discharges.forEach((d,i)=>{const p=[];if(d.frequency)p.push(d.frequency.toLowerCase());if(d.location)p.push(d.location);if(d.morphology)p.push(d.morphology.toLowerCase());if(d.distribution)p.push(“with “+d.distribution.toLowerCase()+” distribution”);L.push(”  “+(i+1)+”. “+(p.join(” “)||“Unspecified discharge”)+”.”);});}else L.push(“No epileptiform discharges are identified.”);
+if(r.epileptiform.images?.length)L.push(”  [”+r.epileptiform.images.length+” EEG screenshot(s) attached]”);L.push(””);
+if(r.periodic.pattern!==“None”||r.rhythmic.pattern!==“None”){L.push(“PERIODIC & RHYTHMIC PATTERNS:”);if(r.periodic.pattern!==“None”){let pl=r.periodic.pattern;if(r.periodic.location)pl+=” at “+r.periodic.location;if(r.periodic.frequency)pl+=”, frequency “+r.periodic.frequency;if(r.periodic.modifier!==“None”)pl+=” “+r.periodic.modifier;L.push(pl+”.”);}if(r.rhythmic.pattern!==“None”){let rl=r.rhythmic.pattern;if(r.rhythmic.location)rl+=” at “+r.rhythmic.location;L.push(rl+”.”);}if(r.periodic.images?.length)L.push(”  [”+r.periodic.images.length+” EEG screenshot(s) attached]”);L.push(””);}
+if(r.focalSlowing.type!==“None”||r.generalizedSlowing.type!==“None”){L.push(“SLOWING:”);if(r.focalSlowing.type!==“None”)L.push(r.focalSlowing.type+(r.focalSlowing.location?” over the “+r.focalSlowing.location+” region”:””)+”.”);if(r.generalizedSlowing.type!==“None”)L.push(r.generalizedSlowing.type+”.”);if(r.focalSlowing.images?.length)L.push(”  [”+r.focalSlowing.images.length+” EEG screenshot(s) attached]”);L.push(””);}
+L.push(“SEIZURES:”);
+if(r.seizures.present===“yes”&&r.seizures.events?.length){r.seizures.events.forEach((s,i)=>{const p=[];if(s.type&&!s.type.startsWith(”\u2014”))p.push(“Classification: “+s.type);if(s.onset)p.push(“Onset: “+s.onset);if(s.duration)p.push(“Duration: “+s.duration);if(s.eegPattern)p.push(“EEG pattern: “+s.eegPattern);if(s.evolution&&s.evolution!==“Not applicable”)p.push(“Evolution: “+s.evolution);if(s.ending)p.push(“Ending: “+s.ending);if(s.semiology&&s.semiology!==“No clinical correlate (subclinical)”)p.push(“Semiology: “+s.semiology);if(s.eegDescription)p.push(“Description: “+s.eegDescription);L.push(”  Event “+(i+1)+”: “+p.join(” | “));});}else L.push(“No electrographic seizures are captured during this recording.”);
+if(r.seizures.images?.length)L.push(”  [”+r.seizures.images.length+” EEG screenshot(s) attached]”);L.push(””);
+if(r.type===“icu”&&r.icuDetails.trendSummary){L.push(“TREND SUMMARY:”);L.push(r.icuDetails.trendSummary);L.push(””);}
+L.push(“IMPRESSION:”);
+if(r.impression.classification)L.push(“This is “+(r.impression.classification===“Abnormal”?“an ABNORMAL”:“a NORMAL”)+” “+(r.type===“routine”?“EEG”:r.type===“ltm”?“long-term EEG monitoring study”:“continuous EEG monitoring study”)+”.”);
+if(r.impression.abnormalities?.length)L.push(“Abnormalities include: “+r.impression.abnormalities.join(”, “)+”.”);
+L.push(””);L.push(“CLINICAL CORRELATION:”);L.push(r.impression.clinicalCorrelation||”***”);
+if(r.impression.additionalComments){L.push(””);L.push(“ADDITIONAL COMMENTS:”);L.push(r.impression.additionalComments);}
+return L.join(”\n”);
+}
+
+const inp = {width:“100%”,padding:“8px 12px”,borderRadius:8,border:“1px solid “+C.brd,background:C.sAlt,color:C.txt,fontSize:13,outline:“none”,boxSizing:“border-box”};
+const ta = {…inp,resize:“vertical”,minHeight:60,fontFamily:“inherit”};
+const r2 = {display:“grid”,gridTemplateColumns:“1fr 1fr”,gap:12};
+const r3 = {display:“grid”,gridTemplateColumns:“1fr 1fr 1fr”,gap:12};
+const bp = {padding:“10px 24px”,borderRadius:8,border:“none”,cursor:“pointer”,fontSize:13,fontWeight:600,background:C.acc,color:”#fff”,display:“inline-flex”,alignItems:“center”,gap:8};
+const bs = {padding:“10px 24px”,borderRadius:8,border:“1px solid “+C.brd,cursor:“pointer”,fontSize:13,fontWeight:500,background:“transparent”,color:C.tSec,display:“inline-flex”,alignItems:“center”,gap:8};
+const eCard = {background:C.sAlt,border:“1px solid “+C.brd,borderRadius:10,padding:16,marginBottom:10};
+const cb = {display:“flex”,alignItems:“center”,gap:8,fontSize:13,color:C.txt,cursor:“pointer”,padding:“4px 0”};
+
+function Preview({report}) {
+const n = genNarr(report);
+const secs = n.split(”\n\n”);
+const allImgs = […(report.background.images||[]).map(i=>({…i,section:“Background”})),…(report.epileptiform.images||[]).map(i=>({…i,section:“Epileptiform Activity”})),…(report.periodic.images||[]).map(i=>({…i,section:“Periodic & Rhythmic Patterns”})),…(report.focalSlowing.images||[]).map(i=>({…i,section:“Slowing”})),…(report.seizures.images||[]).map(i=>({…i,section:“Seizures / Events”}))];
+return html`<div id="report-preview" style=${{background:"#fff",color:"#1a1a1a",borderRadius:12,padding:"40px 48px",fontFamily:"'IBM Plex Serif',Georgia,serif",fontSize:13,lineHeight:1.7,maxWidth:800,margin:"0 auto"}}> <div style=${{textAlign:"center",borderBottom:"2px solid #1a1a1a",paddingBottom:16,marginBottom:24}}> <div style=${{fontSize:11,color:"#888",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>${report.type==="routine"?"Electroencephalogram Report":report.type==="ltm"?"Long-Term EEG Monitoring Report":"Continuous EEG Monitoring Report"}</div> <div style=${{fontSize:18,fontWeight:700}}>EEG REPORT</div> <div style=${{fontSize:11,color:"#888",marginTop:6}}>ACNS Standardized Terminology</div> </div> ${report.patient.name&&html`<div style=${{marginBottom:20,padding:“12px 16px”,background:”#f8f9fa”,borderRadius:8}}>
+<div style=${{display:“grid”,gridTemplateColumns:“160px 1fr”,gap:8,marginBottom:4,fontSize:13}}><span style=${{fontWeight:600,color:”#555”}}>Patient Name:</span><span>${report.patient.name}</span></div>
+${report.patient.sex&&html`<div style=${{display:"grid",gridTemplateColumns:"160px 1fr",gap:8,marginBottom:4,fontSize:13}}><span style=${{fontWeight:600,color:"#555"}}>Sex:</span><span>${report.patient.sex}</span></div>`}
+${report.patient.mrn&&html`<div style=${{display:"grid",gridTemplateColumns:"160px 1fr",gap:8,marginBottom:4,fontSize:13}}><span style=${{fontWeight:600,color:"#555"}}>MRN:</span><span>${report.patient.mrn}</span></div>`}
+${report.patient.dob&&html`<div style=${{display:"grid",gridTemplateColumns:"160px 1fr",gap:8,marginBottom:4,fontSize:13}}><span style=${{fontWeight:600,color:"#555"}}>Date of Birth:</span><span>${report.patient.dob}</span></div>`}
+${report.patient.referringPhysician&&html`<div style=${{display:"grid",gridTemplateColumns:"160px 1fr",gap:8,marginBottom:4,fontSize:13}}><span style=${{fontWeight:600,color:"#555"}}>Referring Physician:</span><span>${report.patient.referringPhysician}</span></div>`}
+${report.patient.indication&&html`<div style=${{display:"grid",gridTemplateColumns:"160px 1fr",gap:8,marginBottom:4,fontSize:13}}><span style=${{fontWeight:600,color:"#555"}}>Indication:</span><span>${report.patient.indication}</span></div>`}
+</div>`} ${secs.map((sec,i)=>{const ls=sec.split("\n");const isH=ls[0]?.endsWith(":")&&ls[0]===ls[0].toUpperCase();return isH?html`<div key=${i}><div style=${{fontSize:14,fontWeight:700,margin:“20px 0 8px”,textTransform:“uppercase”,letterSpacing:“0.04em”,borderBottom:“1px solid #ddd”,paddingBottom:4}}>${ls[0].replace(”:”,””)}</div><div style=${{whiteSpace:“pre-wrap”}}>${ls.slice(1).join(”\n”)}</div></div>`:html`<div key=${i} style=${{whiteSpace:“pre-wrap”,marginBottom:8}}>${sec}</div>`})} ${allImgs.length>0&&html`<div><div style=${{fontSize:14,fontWeight:700,margin:“20px 0 8px”,textTransform:“uppercase”,letterSpacing:“0.04em”,borderBottom:“1px solid #ddd”,paddingBottom:4}}>EEG SCREENSHOTS</div>${allImgs.map((im,idx)=>html`<div key=${idx} style=${{marginBottom:16,textAlign:"center"}}><img src=${im.src} style=${{maxWidth:"100%",borderRadius:6,border:"1px solid #ddd"}} /><div style=${{fontSize:11,color:"#666",marginTop:4}}><em>${im.section}${im.caption?" \u2014 "+im.caption:""}</em></div></div>`)}</div>`}
+<div style=${{marginTop:40,borderTop:“1px solid #ddd”,paddingTop:16,display:“grid”,gridTemplateColumns:“1fr 1fr”,gap:24,fontSize:12,color:”#888”}}>
+<div><div style=${{fontWeight:600,color:”#555”,marginBottom:4}}>Interpreting Physician</div><div style=${{borderBottom:“1px solid #ccc”,paddingBottom:24,marginBottom:4}}></div><div>Signature / Date</div></div>
+<div><div style=${{fontWeight:600,color:”#555”,marginBottom:4}}>Technologist</div><div style=${{borderBottom:“1px solid #ccc”,paddingBottom:24,marginBottom:4}}></div><div>Signature / Date</div></div>
+</div>
+
+  </div>`;
+}
+
+function App() {
+const [rpt, setRpt] = useState(defReport());
+const [view, setView] = useState(“entry”);
+const [toast, setToast] = useState(null);
+const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null), 2500); };
+
+const u = useCallback((path, value) => {
+setRpt(prev => {
+const n = JSON.parse(JSON.stringify(prev));
+const k = path.split(”.”); let o = n;
+for (let i=0;i<k.length-1;i++) o=o[k[i]];
+o[k[k.length-1]] = value; return n;
+});
+}, []);
+
+const addDis = () => u(“epileptiform.discharges”, […rpt.epileptiform.discharges, {morphology:””,location:””,frequency:””,distribution:””}]);
+const rmDis = (i) => u(“epileptiform.discharges”, rpt.epileptiform.discharges.filter((*,x)=>x!==i));
+const upDis = (i,f,v) => {const d=[…rpt.epileptiform.discharges];d[i]={…d[i],[f]:v};u(“epileptiform.discharges”,d);};
+const addSz = () => u(“seizures.events”, […rpt.seizures.events, {type:””,onset:””,duration:””,semiology:””,evolution:””,ending:””,eegPattern:””,eegDescription:””}]);
+const rmSz = (i) => u(“seizures.events”, rpt.seizures.events.filter((*,x)=>x!==i));
+const upSz = (i,f,v) => {const d=[…rpt.seizures.events];d[i]={…d[i],[f]:v};u(“seizures.events”,d);};
+
+const doPrint = () => {
+const c = document.getElementById(“report-preview”); if(!c)return;
+const w = window.open(””,”_blank”);
+w.document.write(’<!DOCTYPE html><html><head><title>EEG Report</title><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;600;700&display=swap" rel="stylesheet"><style>body{font-family:“IBM Plex Serif”,Georgia,serif;margin:40px;color:#1a1a1a;font-size:13px;line-height:1.7}img{max-width:100%;page-break-inside:avoid}@media print{body{margin:20px}}</style></head><body>’+c.innerHTML+’</body></html>’);
+w.document.close(); setTimeout(()=>w.print(), 500);
+};
+
+const doReset = () => { if(confirm(“Reset all fields?”)) setRpt(defReport()); };
+
+const quickN = () => {
+setRpt(prev => ({…prev,
+background:{pdr:“9 Hz \u2014 Alpha”,voltage:“Medium (20-70 \u00B5V)”,symmetry:“Symmetric”,reactivity:“Reactive”,continuity:“Continuous”,apReactivity:“Present and symmetric”,images:prev.background?.images||[]},
+sleep:{captured:“yes”,features:[“Normal sleep transients present”]},
+activations:{hv:“No change”,ips:“Symmetric photic driving”},
+epileptiform:{present:“no”,discharges:[],images:prev.epileptiform?.images||[]},
+periodic:{pattern:“None”,frequency:””,modifier:“None”,location:””,images:prev.periodic?.images||[]},
+rhythmic:{pattern:“None”,location:””},
+focalSlowing:{type:“None”,location:””,images:prev.focalSlowing?.images||[]},
+generalizedSlowing:{type:“None”},
+seizures:{present:“no”,events:[],images:prev.seizures?.images||[]},
+impression:{classification:“Normal”,abnormalities:[],clinicalCorrelation:“This is a normal EEG. A normal EEG does not exclude the diagnosis of epilepsy or other intermittent neurological conditions.”,additionalComments:””},
+}));
+setView(“narrative”);
+showToast(“Normal EEG template applied”);
+};
+
+return html`<div style=${{background:C.bg,minHeight:"100vh",fontFamily:"'IBM Plex Sans','SF Pro Display',-apple-system,sans-serif",color:C.txt}}> <div style=${{background:"linear-gradient(135deg,"+C.srf+","+C.sAlt+")",borderBottom:"1px solid "+C.brd,padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,flexWrap:"wrap",gap:8}}> <div style=${{display:"flex",alignItems:"center",gap:12}}> <div style=${{width:36,height:36,borderRadius:8,background:"linear-gradient(135deg,"+C.acc+",#8B5CF6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"#fff"}}>\u26A1</div> <div><div style=${{fontSize:18,fontWeight:600}}>NeuroReport</div><div style=${{fontSize:11,color:C.tSec,textTransform:"uppercase"}}>EEG Report Generator</div></div> </div> <div style=${{display:"flex",gap:8,flexWrap:"wrap"}}> <button style=${bs} onClick=${quickN}>\u26A1 Quick Normal</button> <button style=${bs} onClick=${doReset}>\u21BA Reset</button> ${view==="preview"&&html`<button style=${bp} onClick=${doPrint}>\uD83D\uDDA8 Print / PDF</button>`} </div> </div> <div style=${{maxWidth:1100,margin:"0 auto",padding:"20px 16px 60px"}}> ${toast&&html`<div style=${{position:“fixed”,top:72,left:“50%”,transform:“translateX(-50%)”,background:C.ok,color:”#000”,padding:“10px 24px”,borderRadius:8,fontSize:13,fontWeight:600,zIndex:200}}>${toast}</div>`} <div style=${{display:"flex",gap:6,marginBottom:24,flexWrap:"wrap"}}> ${[["routine","Routine EEG"],["ltm","LTM / EMU"],["icu","ICU / cEEG"]].map(([k,l])=>html`<button key=${k} style=${{padding:“8px 20px”,borderRadius:20,border:“1px solid “+(rpt.type===k?C.acc:C.brd),cursor:“pointer”,fontSize:13,fontWeight:rpt.type===k?600:400,background:rpt.type===k?C.aDim:“transparent”,color:rpt.type===k?C.acc:C.tSec}} onClick=${()=>setRpt(p=>({…p,type:k}))}>${l}</button>`)} </div> <div style=${{display:"flex",gap:2,background:C.srf,borderRadius:10,padding:3,marginBottom:20,border:"1px solid "+C.brd}}> ${[["entry","\uD83D\uDCDD Data Entry"],["narrative","\uD83D\uDCC4 Narrative"],["preview","\uD83D\uDC41 Report Preview"]].map(([k,l])=>html`<button key=${k} style=${{flex:1,padding:“10px 12px”,borderRadius:8,border:“none”,cursor:“pointer”,fontSize:13,fontWeight:view===k?600:400,background:view===k?C.acc:“transparent”,color:view===k?”#fff”:C.tSec}} onClick=${()=>setView(k)}>${l}</button>`)}
+</div>
+
+```
+  ${view==="entry"&&html`<div>
+    <${Sec} title="Patient Information" defaultOpen=${true}>
+      <div style=${r3}><${Fld} label="Patient Name"><input style=${inp} value=${rpt.patient.name} onChange=${e=>u("patient.name",e.target.value)} placeholder="Last, First" /><//><${Fld} label="MRN"><input style=${inp} value=${rpt.patient.mrn} onChange=${e=>u("patient.mrn",e.target.value)} placeholder="Medical Record Number" /><//><${Fld} label="Sex"><${Sel} value=${rpt.patient.sex} onChange=${v=>u("patient.sex",v)} options=${ACNS.sex} /><//></div>
+      <div style=${r2}><${Fld} label="Date of Birth"><input style=${inp} type="date" value=${rpt.patient.dob} onChange=${e=>u("patient.dob",e.target.value)} /><//><${Fld} label="Referring Physician"><input style=${inp} value=${rpt.patient.referringPhysician} onChange=${e=>u("patient.referringPhysician",e.target.value)} /><//></div>
+      <${Fld} label="Indication"><input style=${inp} value=${rpt.patient.indication} onChange=${e=>u("patient.indication",e.target.value)} placeholder="e.g., Evaluation for seizures" /><//>
+      <${Fld} label="Relevant History"><textarea style=${ta} value=${rpt.patient.relevantHistory} onChange=${e=>u("patient.relevantHistory",e.target.value)} placeholder="Brief relevant clinical history..." /><//>
+    <//>
+    <${Sec} title="Technical Parameters" defaultOpen=${true}>
+      <div style=${r2}><${Fld} label="Recording Duration"><${Sel} value=${rpt.technical.duration} onChange=${v=>u("technical.duration",v)} options=${ACNS.recDur} /><//><${Fld} label="Activation Procedures"><${MSelect} selected=${rpt.technical.activationProcedures} onChange=${v=>u("technical.activationProcedures",v)} options=${ACNS.actProc} /><//></div>
+      <${Fld} label="Current Medications"><${MSelect} selected=${rpt.technical.medications} onChange=${v=>u("technical.medications",v)} options=${ACNS.meds} /><//>
+      <${Fld} label="Technologist Comments"><textarea style=${ta} value=${rpt.technical.techComments} onChange=${e=>u("technical.techComments",e.target.value)} /><//>
+    <//>
+    ${rpt.type==="icu"&&html`<${Sec} title="ICU / Patient State" badge="cEEG" defaultOpen=${true}>
+      <div style=${r2}><${Fld} label="Patient State"><${Sel} value=${rpt.icuDetails.patientState} onChange=${v=>u("icuDetails.patientState",v)} options=${ACNS.patState} /><//><${Fld} label="Sedation"><input style=${inp} value=${rpt.icuDetails.sedation} onChange=${e=>u("icuDetails.sedation",e.target.value)} placeholder="e.g., Propofol 50 mcg/kg/min" /><//></div>
+      <${Fld} label="Stimulation Testing"><textarea style=${ta} value=${rpt.icuDetails.stimTesting} onChange=${e=>u("icuDetails.stimTesting",e.target.value)} /><//>
+      <${Fld} label="Trend Summary"><textarea style=${{...ta,minHeight:100}} value=${rpt.icuDetails.trendSummary} onChange=${e=>u("icuDetails.trendSummary",e.target.value)} /><//>
+    <//>`}
+    <${Sec} title="Background Activity" badge="ACNS">
+      <div style=${r2}><${Fld} label="Posterior Dominant Rhythm"><${Sel} value=${rpt.background.pdr} onChange=${v=>u("background.pdr",v)} options=${ACNS.pdrFrequency} /><//><${Fld} label="Voltage"><${Sel} value=${rpt.background.voltage} onChange=${v=>u("background.voltage",v)} options=${ACNS.voltage} /><//></div>
+      <div style=${r3}><${Fld} label="Symmetry"><${Sel} value=${rpt.background.symmetry} onChange=${v=>u("background.symmetry",v)} options=${ACNS.symmetry} /><//><${Fld} label="Reactivity"><${Sel} value=${rpt.background.reactivity} onChange=${v=>u("background.reactivity",v)} options=${ACNS.reactivity} /><//><${Fld} label="Continuity"><${Sel} value=${rpt.background.continuity} onChange=${v=>u("background.continuity",v)} options=${ACNS.continuity} /><//></div>
+      <${Fld} label="AP Gradient"><${Sel} value=${rpt.background.apReactivity} onChange=${v=>u("background.apReactivity",v)} options=${ACNS.apReactivity} /><//>
+      <${ImgAttach} label="Background EEG Screenshots" images=${rpt.background.images} onChange=${v=>u("background.images",v)} />
+    <//>
+    <${Sec} title="Sleep Architecture">
+      <${Fld} label="Sleep Captured"><div style=${{display:"flex",gap:12}}>${["yes","no"].map(v=>html`<label key=${v} style=${cb}><input type="radio" name="sleep" checked=${rpt.sleep.captured===v} onChange=${()=>u("sleep.captured",v)} /> ${v==="yes"?"Yes":"No"}</label>`)}</div><//>
+      ${rpt.sleep.captured==="yes"&&html`<${Fld} label="Sleep Features"><${MSelect} selected=${rpt.sleep.features} onChange=${v=>u("sleep.features",v)} options=${ACNS.sleepArch} /><//>`}
+    <//>
+    ${rpt.type==="routine"&&html`<${Sec} title="Activation Procedures">
+      <div style=${r2}><${Fld} label="Hyperventilation"><${Sel} value=${rpt.activations.hv} onChange=${v=>u("activations.hv",v)} options=${ACNS.hvResp} /><//><${Fld} label="Intermittent Photic Stimulation"><${Sel} value=${rpt.activations.ips} onChange=${v=>u("activations.ips",v)} options=${ACNS.ipsResp} /><//></div>
+    <//>`}
+    <${Sec} title="Epileptiform Activity" badge="ACNS">
+      <${Fld} label="Epileptiform Discharges Present"><div style=${{display:"flex",gap:12}}>${["yes","no"].map(v=>html`<label key=${v} style=${cb}><input type="radio" name="epi" checked=${rpt.epileptiform.present===v} onChange=${()=>{u("epileptiform.present",v);if(v==="yes"&&!rpt.epileptiform.discharges.length)addDis()}} /> ${v==="yes"?"Yes":"No"}</label>`)}</div><//>
+      ${rpt.epileptiform.present==="yes"&&html`<div>
+        ${rpt.epileptiform.discharges.map((d,i)=>html`<div key=${i} style=${eCard}>
+          <div style=${{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style=${{fontSize:12,fontWeight:600,color:C.acc}}>Discharge #${i+1}</span><button style=${{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,background:"rgba(248,113,113,0.12)",color:C.err}} onClick=${()=>rmDis(i)}>\u2715 Remove</button></div>
+          <div style=${r2}><${Fld} label="Morphology"><${Sel} value=${d.morphology} onChange=${v=>upDis(i,"morphology",v)} options=${ACNS.epiMorph} /><//><${Fld} label="Location"><${Sel} value=${d.location} onChange=${v=>upDis(i,"location",v)} options=${ACNS.epiLoc} /><//></div>
+          <div style=${r2}><${Fld} label="Frequency"><${Sel} value=${d.frequency} onChange=${v=>upDis(i,"frequency",v)} options=${ACNS.epiFreq} /><//><${Fld} label="Distribution"><${Sel} value=${d.distribution} onChange=${v=>upDis(i,"distribution",v)} options=${ACNS.epiDist} /><//></div>
+        </div>`)}
+        <button style=${{padding:"6px 14px",borderRadius:6,border:"1px dashed "+C.brd,cursor:"pointer",fontSize:12,background:"transparent",color:C.acc}} onClick=${addDis}>+ Add Discharge</button>
+      </div>`}
+      <${ImgAttach} label="Epileptiform Activity EEG Screenshots" images=${rpt.epileptiform.images} onChange=${v=>u("epileptiform.images",v)} />
+    <//>
+    <${Sec} title="Periodic & Rhythmic Patterns" badge="ACNS">
+      <div style=${r2}><${Fld} label="Periodic Pattern"><${Sel} value=${rpt.periodic.pattern} onChange=${v=>u("periodic.pattern",v)} options=${ACNS.periodicPat} /><//>${rpt.periodic.pattern!=="None"&&html`<${Fld} label="Frequency"><${Sel} value=${rpt.periodic.frequency} onChange=${v=>u("periodic.frequency",v)} options=${ACNS.periodicFreq} /><//>`}</div>
+      ${rpt.periodic.pattern!=="None"&&html`<div style=${r2}><${Fld} label="Modifier"><${Sel} value=${rpt.periodic.modifier} onChange=${v=>u("periodic.modifier",v)} options=${ACNS.periodicMod} /><//><${Fld} label="Location"><${Sel} value=${rpt.periodic.location} onChange=${v=>u("periodic.location",v)} options=${ACNS.epiLoc} /><//></div>`}
+      <div style=${{marginTop:14,paddingTop:14,borderTop:"1px solid "+C.brd}}>
+        <div style=${r2}><${Fld} label="Rhythmic Pattern"><${Sel} value=${rpt.rhythmic.pattern} onChange=${v=>u("rhythmic.pattern",v)} options=${ACNS.rhythmicPat} /><//>${rpt.rhythmic.pattern!=="None"&&html`<${Fld} label="Location"><${Sel} value=${rpt.rhythmic.location} onChange=${v=>u("rhythmic.location",v)} options=${ACNS.slowLoc} /><//>`}</div>
+      </div>
+      <${ImgAttach} label="Periodic/Rhythmic Pattern EEG Screenshots" images=${rpt.periodic.images} onChange=${v=>u("periodic.images",v)} />
+    <//>
+    <${Sec} title="Slowing">
+      <div style=${r2}><${Fld} label="Focal Slowing"><${Sel} value=${rpt.focalSlowing.type} onChange=${v=>u("focalSlowing.type",v)} options=${ACNS.focalSlow} /><//>${rpt.focalSlowing.type!=="None"&&html`<${Fld} label="Location"><${Sel} value=${rpt.focalSlowing.location} onChange=${v=>u("focalSlowing.location",v)} options=${ACNS.slowLoc} /><//>`}</div>
+      <${Fld} label="Generalized Slowing"><${Sel} value=${rpt.generalizedSlowing.type} onChange=${v=>u("generalizedSlowing.type",v)} options=${ACNS.genSlow} /><//>
+      <${ImgAttach} label="Slowing EEG Screenshots" images=${rpt.focalSlowing.images} onChange=${v=>u("focalSlowing.images",v)} />
+    <//>
+    <${Sec} title="Seizures / Events" badge="ILAE 2017">
+      <${Fld} label="Seizures Captured"><div style=${{display:"flex",gap:12}}>${["yes","no"].map(v=>html`<label key=${v} style=${cb}><input type="radio" name="sz" checked=${rpt.seizures.present===v} onChange=${()=>{u("seizures.present",v);if(v==="yes"&&!rpt.seizures.events.length)addSz()}} /> ${v==="yes"?"Yes":"No"}</label>`)}</div><//>
+      ${rpt.seizures.present==="yes"&&html`<div>
+        ${rpt.seizures.events.map((s,i)=>html`<div key=${i} style=${eCard}>
+          <div style=${{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style=${{fontSize:12,fontWeight:600,color:C.warn}}>Event #${i+1}</span><button style=${{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,background:"rgba(248,113,113,0.12)",color:C.err}} onClick=${()=>rmSz(i)}>\u2715 Remove</button></div>
+          <div style=${r2}><${Fld} label="Seizure Classification (ILAE 2017)"><${Sel} value=${s.type} onChange=${v=>upSz(i,"type",v)} options=${ACNS.szType} /><//><${Fld} label="EEG Onset Location"><${Sel} value=${s.onset} onChange=${v=>upSz(i,"onset",v)} options=${ACNS.szOnset} /><//></div>
+          <div style=${r3}><${Fld} label="Duration"><${Sel} value=${s.duration} onChange=${v=>upSz(i,"duration",v)} options=${ACNS.szDur} /><//><${Fld} label="EEG Pattern"><${Sel} value=${s.eegPattern} onChange=${v=>upSz(i,"eegPattern",v)} options=${ACNS.szEEG} /><//><${Fld} label="Evolution"><${Sel} value=${s.evolution} onChange=${v=>upSz(i,"evolution",v)} options=${ACNS.szEvol} /><//></div>
+          <div style=${r2}><${Fld} label="Seizure Ending"><${Sel} value=${s.ending} onChange=${v=>upSz(i,"ending",v)} options=${ACNS.szEnd} /><//><${Fld} label="Semiology"><${Sel} value=${s.semiology} onChange=${v=>upSz(i,"semiology",v)} options=${ACNS.szSem} /><//></div>
+          <${Fld} label="EEG Description (free text)"><textarea style=${ta} value=${s.eegDescription} onChange=${e=>upSz(i,"eegDescription",e.target.value)} placeholder="Describe the ictal EEG pattern..." /><//>
+        </div>`)}
+        <button style=${{padding:"6px 14px",borderRadius:6,border:"1px dashed "+C.brd,cursor:"pointer",fontSize:12,background:"transparent",color:C.acc}} onClick=${addSz}>+ Add Seizure Event</button>
+      </div>`}
+      <${ImgAttach} label="Seizure / Event EEG Screenshots" images=${rpt.seizures.images} onChange=${v=>u("seizures.images",v)} />
+    <//>
+    <${Sec} title="Impression & Clinical Correlation" defaultOpen=${true}>
+      <${Fld} label="Overall Classification"><div style=${{display:"flex",gap:12}}>${["Normal","Abnormal"].map(v=>html`<label key=${v} style=${cb}><input type="radio" name="imp" checked=${rpt.impression.classification===v} onChange=${()=>u("impression.classification",v)} /> ${v}</label>`)}</div><//>
+      ${rpt.impression.classification==="Abnormal"&&html`<${Fld} label="Abnormalities"><${MSelect} selected=${rpt.impression.abnormalities} onChange=${v=>u("impression.abnormalities",v)} options=${ACNS.abnType} /><//>`}
+      <${Fld} label="Clinical Correlation"><textarea style=${{...ta,minHeight:80}} value=${rpt.impression.clinicalCorrelation} onChange=${e=>u("impression.clinicalCorrelation",e.target.value)} placeholder="Provide clinical correlation and interpretation..." /><//>
+      <${Fld} label="Additional Comments"><textarea style=${ta} value=${rpt.impression.additionalComments} onChange=${e=>u("impression.additionalComments",e.target.value)} /><//>
+    <//>
+  </div>`}
+
+  ${view==="narrative"&&html`<div>
+    <div style=${{marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style=${{fontSize:13,color:C.tSec}}>Auto-generated from structured data</span><button style=${bs} onClick=${()=>navigator.clipboard.writeText(genNarr(rpt))}>\uD83D\uDCCB Copy</button></div>
+    <div style=${{background:C.sBg,border:"1px solid "+C.brd,borderRadius:12,padding:"20px 24px",whiteSpace:"pre-wrap",fontSize:13.5,lineHeight:1.75,color:C.txt,fontFamily:"'IBM Plex Serif',Georgia,serif"}}>${genNarr(rpt)}</div>
+  </div>`}
+
+  ${view==="preview"&&html`<div>
+    <div style=${{marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style=${{fontSize:13,color:C.tSec}}>Formatted report preview</span><button style=${bp} onClick=${doPrint}>\uD83D\uDDA8 Print / PDF</button></div>
+    <${Preview} report=${rpt} />
+  </div>`}
+</div>
+```
+
+  </div>`;
+}
+
+render(h(App), document.getElementById(‘root’));
+
+</script>
+</body>
+</html>
