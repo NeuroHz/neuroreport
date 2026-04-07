@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NeuroReport">
+<meta name="theme-color" content="#5B8DEF">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>NeuroReport</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0F1117;overflow-y:scroll;-webkit-overflow-scrolling:touch}
+select,input,textarea,button{font-family:inherit}
+#loading{position:fixed;top:0;left:0;right:0;bottom:0;background:#0F1117;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#8B90A0;font-family:'IBM Plex Sans',sans-serif;font-size:14px;z-index:9999}
+.spinner{width:36px;height:36px;border:3px solid #2A2F3F;border-top-color:#5B8DEF;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div>Loading NeuroReport...</div>
+<div id="root"></div>
+<div id="error-display" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#0F1117;color:#F87171;padding:20px;font-family:monospace;font-size:12px;overflow:auto;z-index:10000"></div>
+
+<script>
+window.onerror = function(msg, url, line, col, error) {
+  var el = document.getElementById('error-display');
+  el.style.display = 'block';
+  el.innerHTML = '<h3 style="color:#FBBF24">NeuroReport Error</h3><p>' + msg + '</p><p>Line: ' + line + '</p><pre>' + (error ? error.stack : '') + '</pre><p style="color:#8B90A0;margin-top:20px">Take a screenshot of this and share it so we can fix it.</p>';
+
+document.getElementById(‘loading’).style.display = ‘none’;
+};
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+
+<script id="app-source" type="text/babel" data-presets="react">
+const { useState, useCallback, useRef } = React;
+
+
+const ACNS_TERMINOLOGY = {
+  sex: ["Male", "Female", "Other", "Unknown"],
+  backgroundFrequency: ["<4 Hz (Delta)", "4-7 Hz (Theta)", "8-13 Hz (Alpha)", ">13 Hz (Beta)"],
+  pdrFrequency: [
+    "No discernible PDR",
+    "4 Hz — Theta",
+    "5 Hz — Theta",
+    "6 Hz — Theta",
+    "7 Hz — Theta",
+    "8 Hz — Alpha",
+    "8.5 Hz — Alpha",
+    "9 Hz — Alpha",
+    "9.5 Hz — Alpha",
+    "10 Hz — Alpha",
+    "10.5 Hz — Alpha",
+    "11 Hz — Alpha",
+    "12 Hz — Alpha",
+    "13 Hz — Alpha / Beta border",
+  ],
+  voltage: ["Low (<20 µV)", "Medium (20-70 µV)", "High (>70 µV)"],
+  symmetry: ["Symmetric", "Asymmetric - higher amplitude left", "Asymmetric - higher amplitude right"],
+  reactivity: ["Reactive", "Not reactive", "Not tested"],
+  apReactivity: ["Present and symmetric", "Present and asymmetric", "Absent"],
+  continuity: ["Continuous", "Nearly continuous", "Discontinuous", "Burst-suppression", "Burst-attenuation", "Suppression (<10 µV)", "Electrocerebral inactivity"],
+  sleepArchitecture: ["Not captured", "Normal sleep transients present", "Abnormal sleep architecture", "Sleep spindles present", "K-complexes present", "Vertex waves present", "REM sleep captured"],
+  epileptiformMorphology: ["Spikes", "Sharp waves", "Spike-and-wave", "Polyspike", "Polyspike-and-wave", "Sharp-and-slow-wave"],
+  epileptiformLocation: [
+    "Fp1", "Fp2", "F3", "F4", "C3", "C4", "P3", "P4", "O1", "O2",
+    "F7", "F8", "T3/T7", "T4/T8", "T5/P7", "T6/P8", "Fz", "Cz", "Pz",
+    "Left frontal", "Right frontal", "Left temporal", "Right temporal",
+    "Left parietal", "Right parietal", "Left occipital", "Right occipital",
+    "Left frontotemporal", "Right frontotemporal", "Left centrotemporal", "Right centrotemporal",
+    "Left posterior temporal", "Right posterior temporal",
+    "Bifrontal", "Bitemporal", "Generalized", "Multifocal"
+  ],
+  epileptiformFrequency: ["Rare (<1/hr)", "Occasional (1/hr to <1/min)", "Frequent (≥1/min to <1/10s)", "Abundant (≥1/10s)", "Very abundant (nearly continuous)"],
+  epileptiformDistribution: ["Focal", "Multifocal", "Generalized", "Lateralized", "Bilateral independent"],
+  periodicPattern: ["None", "GPDs (Generalized Periodic Discharges)", "LPDs (Lateralized Periodic Discharges)", "BIPDs (Bilateral Independent Periodic Discharges)", "SIRPIDS (Stimulus-Induced Rhythmic, Periodic, or Ictal Discharges)"],
+  periodicFrequency: ["<0.5 Hz", "0.5-1 Hz", "1-2 Hz", "2-3 Hz", ">3 Hz"],
+  periodicModifier: ["None", "+R (with rhythmic activity)", "+F (with fast activity)", "+S (with sharp component)", "+FR (with fast and rhythmic)"],
+  rhythmicPattern: ["None", "GRDA (Generalized Rhythmic Delta Activity)", "LRDA (Lateralized Rhythmic Delta Activity)", "Frontal Intermittent Rhythmic Delta Activity (FIRDA)", "Temporal Intermittent Rhythmic Delta Activity (TIRDA)", "Occipital Intermittent Rhythmic Delta Activity (OIRDA)"],
+  focalSlowing: ["None", "Intermittent focal slowing", "Continuous focal slowing", "Polymorphic delta activity", "Intermittent rhythmic delta activity"],
+  slowingLocation: ["Left frontal", "Right frontal", "Left temporal", "Right temporal", "Left parietal", "Right parietal", "Left occipital", "Right occipital", "Left hemisphere", "Right hemisphere", "Bifrontal", "Bitemporal", "Generalized"],
+  generalizedSlowing: ["None", "Mild generalized slowing", "Moderate generalized slowing", "Severe generalized slowing", "Diffuse background attenuation"],
+  hvResponse: ["Not performed", "No change", "Symmetric slowing", "Asymmetric slowing", "Provoked epileptiform discharges", "Provoked seizure"],
+  ipsResponse: ["Not performed", "No photic driving", "Symmetric photic driving", "Asymmetric photic driving", "Photoparoxysmal response", "Photomyogenic response"],
+  seizureType: [
+    "— FOCAL ONSET —",
+    "Focal onset - aware",
+    "Focal onset - impaired awareness",
+    "Focal onset - awareness unknown",
+    "Focal to bilateral tonic-clonic",
+    "— Focal Motor —",
+    "Focal motor - automatisms",
+    "Focal motor - atonic",
+    "Focal motor - clonic",
+    "Focal motor - epileptic spasms",
+    "Focal motor - hyperkinetic",
+    "Focal motor - myoclonic",
+    "Focal motor - tonic",
+    "— Focal Non-Motor —",
+    "Focal non-motor - autonomic",
+    "Focal non-motor - behavior arrest",
+    "Focal non-motor - cognitive",
+    "Focal non-motor - emotional",
+    "Focal non-motor - sensory",
+    "— GENERALIZED ONSET —",
+    "Generalized motor - tonic-clonic",
+    "Generalized motor - tonic",
+    "Generalized motor - clonic",
+    "Generalized motor - myoclonic",
+    "Generalized motor - myoclonic-tonic-clonic",
+    "Generalized motor - myoclonic-atonic",
+    "Generalized motor - atonic",
+    "Generalized motor - epileptic spasms",
+    "— Generalized Non-Motor (Absence) —",
+    "Generalized non-motor - typical absence",
+    "Generalized non-motor - atypical absence",
+    "Generalized non-motor - myoclonic absence",
+    "Generalized non-motor - eyelid myoclonia",
+    "— UNKNOWN ONSET —",
+    "Unknown onset - motor - tonic-clonic",
+    "Unknown onset - motor - epileptic spasms",
+    "Unknown onset - non-motor - behavior arrest",
+    "Unknown onset",
+    "— OTHER —",
+    "Electrographic only (subclinical)",
+    "Status epilepticus - focal",
+    "Status epilepticus - generalized convulsive",
+    "Status epilepticus - generalized non-convulsive",
+    "Status epilepticus - unknown",
+    "Unclassified",
+  ],
+  seizureSemiology: [
+    "No clinical correlate (subclinical)",
+    "Behavioral arrest",
+    "Automatisms - oroalimentary",
+    "Automatisms - manual/gestural",
+    "Automatisms - leg pedaling/bicycling",
+    "Automatisms - perseverative",
+    "Automatisms - hyperkinetic",
+    "Tonic posturing - unilateral",
+    "Tonic posturing - bilateral",
+    "Tonic posturing - figure of 4",
+    "Clonic movements - focal",
+    "Clonic movements - bilateral",
+    "Tonic-clonic",
+    "Myoclonic jerks - focal",
+    "Myoclonic jerks - generalized",
+    "Atonic / drop attack",
+    "Epileptic spasms",
+    "Versive - head",
+    "Versive - eye",
+    "Aphasia / speech arrest",
+    "Autonomic - ictal tachycardia",
+    "Autonomic - ictal bradycardia",
+    "Autonomic - apnea",
+    "Autonomic - emesis",
+    "Autonomic - piloerection",
+    "Sensory - somatosensory",
+    "Sensory - visual",
+    "Sensory - auditory",
+    "Sensory - olfactory/gustatory",
+    "Emotional - fear/anxiety",
+    "Emotional - laughing (gelastic)",
+    "Emotional - crying (dacrystic)",
+    "Cognitive - deja vu / jamais vu",
+    "Cognitive - hallucinations",
+    "Cognitive - forced thinking",
+    "Aura only",
+    "Other"
+  ],
+  seizureOnset: [
+    "Left frontal", "Right frontal", "Left temporal", "Right temporal",
+    "Left parietal", "Right parietal", "Left occipital", "Right occipital",
+    "Left frontotemporal", "Right frontotemporal",
+    "Left centrotemporal", "Right centrotemporal",
+    "Left posterior temporal", "Right posterior temporal",
+    "Left frontoparietal", "Right frontoparietal",
+    "Left temporo-occipital", "Right temporo-occipital",
+    "Left hemisphere (diffuse)", "Right hemisphere (diffuse)",
+    "Bilateral frontal", "Bilateral temporal",
+    "Generalized", "Diffuse",
+    "Midline (vertex/Cz)", "Obscured by artifact", "Unable to determine"
+  ],
+  seizureEvolution: [
+    "Not applicable",
+    "Remained focal",
+    "Focal to bilateral (secondary generalization)",
+    "Evolved in frequency",
+    "Evolved in distribution",
+    "Evolved in morphology",
+    "Fluctuating",
+    "Static",
+  ],
+  seizureEnd: [
+    "Abrupt cessation",
+    "Gradual offset",
+    "Post-ictal suppression - focal",
+    "Post-ictal suppression - generalized",
+    "Post-ictal slowing - focal",
+    "Post-ictal slowing - generalized",
+    "Terminated with intervention (medication)",
+    "Terminated with stimulation",
+    "Unclear offset",
+  ],
+  seizureDuration: ["<10 seconds", "10-30 seconds", "30-60 seconds", "1-2 minutes", "2-5 minutes", "5-10 minutes", ">10 minutes", "Continuous (status epilepticus)"],
+  seizureEEGPattern: [
+    "Rhythmic theta activity",
+    "Rhythmic delta activity",
+    "Rhythmic alpha activity",
+    "Rhythmic beta activity",
+    "Spike-and-wave",
+    "Polyspike-and-wave",
+    "Low voltage fast activity",
+    "Electrodecremental pattern",
+    "Repetitive sharp waves",
+    "Repetitive spikes",
+    "Generalized paroxysmal fast activity (GPFA)",
+    "Hypsarrhythmia with electrodecrement",
+    "Other",
+  ],
+  impression: ["Normal", "Abnormal"],
+  abnormalityType: [
+    "Epileptiform discharges",
+    "Electrographic seizures",
+    "Focal slowing",
+    "Generalized slowing",
+    "Periodic discharges",
+    "Rhythmic delta activity",
+    "Background asymmetry",
+    "Burst suppression",
+    "Electrocerebral inactivity",
+    "Excess beta activity",
+    "Breach rhythm"
+  ],
+  icuBackground: ["Well organized", "Mildly disorganized", "Moderately disorganized", "Severely disorganized", "Diffusely attenuated", "Unreactive"],
+  patientState: ["Awake", "Drowsy", "Asleep", "Obtunded", "Comatose", "Sedated", "Pharmacologically paralyzed", "Post-ictal"],
+  medications: ["None documented", "Levetiracetam", "Phenytoin/Fosphenytoin", "Lacosamide", "Valproic acid", "Carbamazepine", "Oxcarbazepine", "Lamotrigine", "Topiramate", "Zonisamide", "Phenobarbital", "Midazolam drip", "Propofol drip", "Pentobarbital drip", "Ketamine drip", "Lorazepam", "Diazepam", "Clobazam", "Brivaracetam", "Perampanel", "Cenobamate", "Cannabidiol", "Other"],
+  activationProcedures: ["Hyperventilation", "Intermittent photic stimulation", "Sleep deprivation", "None performed"],
+  recordingDuration: ["20 minutes", "30 minutes", "40 minutes", "60 minutes", "2 hours", "4 hours", "8 hours", "12 hours", "24 hours", "48 hours", "72 hours", "5 days", "7 days", "Other"],
+};
+
+const COLORS = {
+  bg: "#0F1117", surface: "#181B25", surfaceAlt: "#1E2231", border: "#2A2F3F",
+  borderFocus: "#5B8DEF", accent: "#5B8DEF", accentDim: "rgba(91,141,239,0.12)",
+  accentHover: "#4A7DE0", text: "#E8EAF0", textSecondary: "#8B90A0",
+  textMuted: "#5A5F72", success: "#4ADE80", warning: "#FBBF24", error: "#F87171",
+  sectionBg: "#141720", imgBorder: "#3A3F52",
+};
+
+const S = {
+  app: { background: COLORS.bg, minHeight: "100vh", fontFamily: "'IBM Plex Sans', 'SF Pro Display', -apple-system, sans-serif", color: COLORS.text },
+  header: { background: `linear-gradient(135deg, ${COLORS.surface} 0%, ${COLORS.surfaceAlt} 100%)`, borderBottom: `1px solid ${COLORS.border}`, padding: "16px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 },
+  logo: { display: "flex", alignItems: "center", gap: 12 },
+  logoIcon: { width: 36, height: 36, borderRadius: 8, background: `linear-gradient(135deg, ${COLORS.accent}, #8B5CF6)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff" },
+  logoText: { fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em" },
+  logoSub: { fontSize: 11, color: COLORS.textSecondary, fontWeight: 400, letterSpacing: "0.04em", textTransform: "uppercase", marginTop: 1 },
+  container: { maxWidth: 1100, margin: "0 auto", padding: "20px 24px 60px" },
+  tabs: { display: "flex", gap: 2, background: COLORS.surface, borderRadius: 10, padding: 3, marginBottom: 20, border: `1px solid ${COLORS.border}` },
+  tab: (a) => ({ flex: 1, padding: "10px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: a ? 600 : 400, background: a ? COLORS.accent : "transparent", color: a ? "#fff" : COLORS.textSecondary, transition: "all 0.2s" }),
+  rtTabs: { display: "flex", gap: 6, marginBottom: 24 },
+  rtTab: (a) => ({ padding: "8px 20px", borderRadius: 20, border: `1px solid ${a ? COLORS.accent : COLORS.border}`, cursor: "pointer", fontSize: 13, fontWeight: a ? 600 : 400, background: a ? COLORS.accentDim : "transparent", color: a ? COLORS.accent : COLORS.textSecondary, transition: "all 0.2s" }),
+  sec: { background: COLORS.surface, borderRadius: 12, border: `1px solid ${COLORS.border}`, marginBottom: 16, overflow: "hidden" },
+  secH: (o) => ({ padding: "14px 20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", background: o ? COLORS.sectionBg : "transparent", transition: "background 0.2s", userSelect: "none" }),
+  secT: { fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em", display: "flex", alignItems: "center", gap: 8 },
+  badge: { fontSize: 10, padding: "2px 8px", borderRadius: 10, background: COLORS.accentDim, color: COLORS.accent, fontWeight: 600 },
+  secB: { padding: "16px 20px", borderTop: `1px solid ${COLORS.border}` },
+  fg: { marginBottom: 14 },
+  lbl: { display: "block", fontSize: 12, fontWeight: 500, color: COLORS.textSecondary, marginBottom: 5, letterSpacing: "0.02em" },
+  sel: { width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surfaceAlt, color: COLORS.text, fontSize: 13, outline: "none", cursor: "pointer", appearance: "auto" },
+  inp: { width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surfaceAlt, color: COLORS.text, fontSize: 13, outline: "none", boxSizing: "border-box" },
+  ta: { width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surfaceAlt, color: COLORS.text, fontSize: 13, outline: "none", resize: "vertical", minHeight: 60, fontFamily: "inherit", boxSizing: "border-box" },
+  r2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
+  r3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 },
+  cb: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: COLORS.text, cursor: "pointer", padding: "4px 0" },
+  narr: { background: COLORS.sectionBg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px", whiteSpace: "pre-wrap", fontSize: 13.5, lineHeight: 1.75, color: COLORS.text, fontFamily: "'IBM Plex Serif', Georgia, serif" },
+  bp: { padding: "10px 24px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: COLORS.accent, color: "#fff", transition: "all 0.2s", display: "inline-flex", alignItems: "center", gap: 8 },
+  bs: { padding: "10px 24px", borderRadius: 8, border: `1px solid ${COLORS.border}`, cursor: "pointer", fontSize: 13, fontWeight: 500, background: "transparent", color: COLORS.textSecondary, transition: "all 0.2s", display: "inline-flex", alignItems: "center", gap: 8 },
+  addB: { padding: "6px 14px", borderRadius: 6, border: `1px dashed ${COLORS.border}`, cursor: "pointer", fontSize: 12, fontWeight: 500, background: "transparent", color: COLORS.accent, display: "inline-flex", alignItems: "center", gap: 6 },
+  rmB: { padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 500, background: "rgba(248,113,113,0.12)", color: COLORS.error },
+  eCard: { background: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 16, marginBottom: 10 },
+  ms: { display: "flex", flexWrap: "wrap", gap: 6 },
+  chip: (s) => ({ padding: "5px 12px", borderRadius: 16, border: `1px solid ${s ? COLORS.accent : COLORS.border}`, cursor: "pointer", fontSize: 12, fontWeight: s ? 600 : 400, background: s ? COLORS.accentDim : "transparent", color: s ? COLORS.accent : COLORS.textSecondary, transition: "all 0.15s", whiteSpace: "nowrap" }),
+  prev: { background: "#fff", color: "#1a1a1a", borderRadius: 12, padding: "40px 48px", fontFamily: "'IBM Plex Serif', Georgia, serif", fontSize: 13, lineHeight: 1.7, maxWidth: 800, margin: "0 auto" },
+  pH: { textAlign: "center", borderBottom: "2px solid #1a1a1a", paddingBottom: 16, marginBottom: 24 },
+  pH1: { fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: "0.02em" },
+  pH2: { fontSize: 14, fontWeight: 700, margin: "20px 0 8px", textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: "1px solid #ddd", paddingBottom: 4 },
+  pF: { display: "grid", gridTemplateColumns: "160px 1fr", gap: 8, marginBottom: 4, fontSize: 13 },
+  pL: { fontWeight: 600, color: "#555" },
+  dz: { border: `2px dashed ${COLORS.imgBorder}`, borderRadius: 10, padding: "12px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, cursor: "pointer", transition: "all 0.2s", background: "rgba(91,141,239,0.04)", minHeight: 60, justifyContent: "center" },
+  iThumb: { width: 120, height: 90, objectFit: "cover", borderRadius: 6, border: `1px solid ${COLORS.border}`, cursor: "pointer" },
+  iRow: { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "zoom-out" },
+};
+
+const Field = ({ label, children }) => (<div style={S.fg}><label style={S.lbl}>{label}</label>{children}</div>);
+
+const Sel = ({ value, onChange, options, placeholder }) => (
+  <select style={S.sel} value={value || ""} onChange={e => onChange(e.target.value)}>
+    <option value="" disabled>{placeholder || "Select..."}</option>
+    {options.map(o => {
+      const isG = o.startsWith("\u2014");
+      return <option key={o} value={o} disabled={isG} style={isG ? { fontWeight: 700, color: "#5B8DEF", background: "#1E2231" } : {}}>{o}</option>;
+    })}
+  </select>
+);
+
+const MS = ({ selected = [], onChange, options }) => (
+  <div style={S.ms}>
+    {options.map(o => (
+      <span key={o} style={S.chip(selected.includes(o))} onClick={() => onChange(selected.includes(o) ? selected.filter(s => s !== o) : [...selected, o])}>{o}</span>
+    ))}
+  </div>
+);
+
+const Sec = ({ title, badge, children, defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={S.sec}>
+      <div style={S.secH(open)} onClick={() => setOpen(!open)}>
+        <div style={S.secT}><span>{open ? "\u25BE" : "\u25B8"}</span>{title}{badge && <span style={S.badge}>{badge}</span>}</div>
+      </div>
+      {open && <div style={S.secB}>{children}</div>}
+    </div>
+  );
+};
+
+function ImgAttach({ images = [], onChange, label }) {
+  const fRef = useRef();
+  const [lb, setLb] = useState(null);
+  const add = (files) => {
+    Array.from(files).forEach(f => {
+      if (!f.type.startsWith("image/")) return;
+      const r = new FileReader();
+      r.onload = (e) => onChange([...images, { src: e.target.result, name: f.name, caption: "" }]);
+      r.readAsDataURL(f);
+    });
+  };
+  const onPaste = (e) => {
+    const items = e.clipboardData?.items; if (!items) return;
+    const imgs = [];
+    for (let i = 0; i < items.length; i++) if (items[i].type.startsWith("image/")) imgs.push(items[i].getAsFile());
+    if (imgs.length) { e.preventDefault(); add(imgs); }
+  };
+  const onDrop = (e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer.files?.length) add(e.dataTransfer.files); };
+  const rm = (idx) => onChange(images.filter((_, i) => i !== idx));
+  const cap = (idx, c) => { const u = [...images]; u[idx] = { ...u[idx], caption: c }; onChange(u); };
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <label style={{ ...S.lbl, fontSize: 11, color: COLORS.textMuted }}>{label || "EEG Screenshots"}</label>
+      <div style={S.dz} onClick={() => fRef.current?.click()} onPaste={onPaste} onDrop={onDrop} onDragOver={e => { e.preventDefault(); e.stopPropagation(); }} tabIndex={0}>
+        <input ref={fRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => { add(e.target.files); e.target.value = ""; }} />
+        <span style={{ fontSize: 20 }}>📷</span>
+        <span style={{ fontSize: 12, color: COLORS.textSecondary }}>Click to upload, drag & drop, or <strong style={{ color: COLORS.accent }}>paste (Ctrl+V)</strong> EEG screenshots</span>
+      </div>
+      {images.length > 0 && (
+        <div style={S.iRow}>
+          {images.map((img, idx) => (
+            <div key={idx} style={{ position: "relative", display: "inline-flex", flexDirection: "column", gap: 4 }}>
+              <img src={img.src} alt={img.name} style={S.iThumb} onClick={() => setLb(img.src)} />
+              <input style={{ ...S.inp, width: 120, fontSize: 10, padding: "3px 6px" }} placeholder="Caption..." value={img.caption} onChange={e => cap(idx, e.target.value)} onClick={e => e.stopPropagation()} />
+              <button style={{ position: "absolute", top: -4, right: -4, width: 18, height: 18, borderRadius: 9, background: COLORS.error, color: "#fff", border: "none", cursor: "pointer", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} onClick={(e) => { e.stopPropagation(); rm(idx); }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {lb && <div style={S.overlay} onClick={() => setLb(null)}><img src={lb} alt="EEG" style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 8 }} /></div>}
+    </div>
+  );
+}
+
+const defReport = () => ({
+  type: "routine",
+  patient: { name: "", mrn: "", dob: "", sex: "", referringPhysician: "", indication: "", relevantHistory: "" },
+  technical: { duration: "", medications: [], activationProcedures: [], techComments: "" },
+  background: { pdr: "", voltage: "", symmetry: "", reactivity: "", continuity: "Continuous", apReactivity: "", images: [] },
+  sleep: { captured: "no", features: [] },
+  activations: { hv: "Not performed", ips: "Not performed" },
+  epileptiform: { present: "no", discharges: [], images: [] },
+  periodic: { pattern: "None", frequency: "", modifier: "None", location: "", images: [] },
+  rhythmic: { pattern: "None", location: "" },
+  focalSlowing: { type: "None", location: "", images: [] },
+  generalizedSlowing: { type: "None" },
+  seizures: { present: "no", events: [], images: [] },
+  icuDetails: { patientState: "", sedation: "", stimTesting: "", trendSummary: "" },
+  impression: { classification: "", abnormalities: [], clinicalCorrelation: "", additionalComments: "" },
+});
+const defDis = () => ({ morphology: "", location: "", frequency: "", distribution: "" });
+const defSz = () => ({ type: "", onset: "", duration: "", semiology: "", evolution: "", ending: "", eegPattern: "", eegDescription: "" });
+
+function genNarr(r) {
+  const L = [];
+  const tp = r.type === "routine" ? "ROUTINE EEG REPORT" : r.type === "ltm" ? "LONG-TERM MONITORING / EMU REPORT" : "ICU CONTINUOUS EEG MONITORING REPORT";
+  L.push(`[${tp}]\n`);
+  if (r.patient.name || r.patient.mrn) {
+    let p = `Patient: ${r.patient.name || "___"}`;
+    if (r.patient.sex) p += ` | Sex: ${r.patient.sex}`;
+    if (r.patient.mrn) p += ` | MRN: ${r.patient.mrn}`;
+    if (r.patient.dob) p += ` | DOB: ${r.patient.dob}`;
+    L.push(p);
+    if (r.patient.referringPhysician) L.push(`Referring Physician: ${r.patient.referringPhysician}`);
+    if (r.patient.indication) L.push(`Indication: ${r.patient.indication}`);
+    L.push("");
+  }
+  L.push("TECHNICAL DESCRIPTION:");
+  const tp2 = [];
+  if (r.technical.duration) tp2.push(`Recording duration: ${r.technical.duration}.`);
+  if (r.technical.activationProcedures?.length) tp2.push(`Activation procedures: ${r.technical.activationProcedures.join(", ")}.`);
+  if (r.technical.medications?.length) tp2.push(`Current medications: ${r.technical.medications.join(", ")}.`);
+  if (r.technical.techComments) tp2.push(r.technical.techComments);
+  L.push(tp2.join(" ") || "No technical details recorded.");
+  L.push("");
+  if (r.type === "icu") {
+    L.push("PATIENT STATE:");
+    const ic = [];
+    if (r.icuDetails.patientState) ic.push(`Patient state: ${r.icuDetails.patientState}.`);
+    if (r.icuDetails.sedation) ic.push(`Sedation: ${r.icuDetails.sedation}.`);
+    if (r.icuDetails.stimTesting) ic.push(`Stimulation testing: ${r.icuDetails.stimTesting}.`);
+    L.push(ic.join(" ") || "Not documented."); L.push("");
+  }
+  L.push("BACKGROUND:");
+  const bg = [];
+  if (r.background.pdr && r.background.pdr !== "No discernible PDR") {
+    const pdrClean = r.background.pdr.split(" — ")[0];
+    bg.push(`The posterior dominant rhythm consists of ${pdrClean} activity`);
+    if (r.background.voltage) bg.push(`, ${r.background.voltage.toLowerCase()} in amplitude`);
+    if (r.background.symmetry) bg.push(`, ${r.background.symmetry.toLowerCase()}`);
+    if (r.background.reactivity) bg.push(`, and ${r.background.reactivity.toLowerCase()} to eye opening`);
+    bg.push(".");
+  } else if (r.background.pdr === "No discernible PDR") bg.push("No discernible posterior dominant rhythm is identified.");
+  if (r.background.continuity && r.background.continuity !== "Continuous") bg.push(` The background is ${r.background.continuity.toLowerCase()}.`);
+  else if (r.background.continuity === "Continuous") bg.push(" The background is continuous.");
+  if (r.background.apReactivity && r.background.apReactivity !== "Present and symmetric") bg.push(` Anterior-posterior gradient is ${r.background.apReactivity.toLowerCase()}.`);
+  L.push(bg.join("") || "Background not described.");
+  if (r.background.images?.length) L.push(`  [${r.background.images.length} EEG screenshot(s) attached]`);
+  L.push("");
+  if (r.sleep.captured === "yes") {
+    L.push("SLEEP:"); L.push(r.sleep.features?.length ? r.sleep.features.join(". ") + "." : "Sleep was captured but no specific features documented."); L.push("");
+  }
+  if (r.type === "routine") {
+    L.push("ACTIVATION PROCEDURES:");
+    const a = [];
+    a.push(r.activations.hv !== "Not performed" ? `Hyperventilation: ${r.activations.hv}.` : "Hyperventilation was not performed.");
+    a.push(r.activations.ips !== "Not performed" ? `Intermittent photic stimulation: ${r.activations.ips}.` : "Intermittent photic stimulation was not performed.");
+    L.push(a.join(" ")); L.push("");
+  }
+  L.push("EPILEPTIFORM ACTIVITY:");
+  if (r.epileptiform.present === "yes" && r.epileptiform.discharges?.length) {
+    r.epileptiform.discharges.forEach((d, i) => {
+      const p = [];
+      if (d.frequency) p.push(d.frequency.toLowerCase());
+      if (d.location) p.push(d.location);
+      if (d.morphology) p.push(d.morphology.toLowerCase());
+      if (d.distribution) p.push(`with ${d.distribution.toLowerCase()} distribution`);
+      L.push(`  ${i + 1}. ${p.join(" ") || "Unspecified discharge"}.`);
+    });
+  } else L.push("No epileptiform discharges are identified.");
+  if (r.epileptiform.images?.length) L.push(`  [${r.epileptiform.images.length} EEG screenshot(s) attached]`);
+  L.push("");
+  const hasPer = r.periodic.pattern !== "None", hasRhy = r.rhythmic.pattern !== "None";
+  if (hasPer || hasRhy) {
+    L.push("PERIODIC & RHYTHMIC PATTERNS:");
+    if (hasPer) { let pl = r.periodic.pattern; if (r.periodic.location) pl += ` at ${r.periodic.location}`; if (r.periodic.frequency) pl += `, frequency ${r.periodic.frequency}`; if (r.periodic.modifier !== "None") pl += ` ${r.periodic.modifier}`; L.push(pl + "."); }
+    if (hasRhy) { let rl = r.rhythmic.pattern; if (r.rhythmic.location) rl += ` at ${r.rhythmic.location}`; L.push(rl + "."); }
+    if (r.periodic.images?.length) L.push(`  [${r.periodic.images.length} EEG screenshot(s) attached]`);
+    L.push("");
+  }
+  const hasSl = r.focalSlowing.type !== "None" || r.generalizedSlowing.type !== "None";
+  if (hasSl) {
+    L.push("SLOWING:");
+    if (r.focalSlowing.type !== "None") L.push(`${r.focalSlowing.type}${r.focalSlowing.location ? ` over the ${r.focalSlowing.location} region` : ""}.`);
+    if (r.generalizedSlowing.type !== "None") L.push(`${r.generalizedSlowing.type}.`);
+    if (r.focalSlowing.images?.length) L.push(`  [${r.focalSlowing.images.length} EEG screenshot(s) attached]`);
+    L.push("");
+  }
+  L.push("SEIZURES:");
+  if (r.seizures.present === "yes" && r.seizures.events?.length) {
+    r.seizures.events.forEach((s, i) => {
+      const p = [];
+      if (s.type && !s.type.startsWith("\u2014")) p.push(`Classification: ${s.type}`);
+      if (s.onset) p.push(`Onset: ${s.onset}`);
+      if (s.duration) p.push(`Duration: ${s.duration}`);
+      if (s.eegPattern) p.push(`EEG pattern: ${s.eegPattern}`);
+      if (s.evolution && s.evolution !== "Not applicable") p.push(`Evolution: ${s.evolution}`);
+      if (s.ending) p.push(`Ending: ${s.ending}`);
+      if (s.semiology && s.semiology !== "No clinical correlate (subclinical)") p.push(`Semiology: ${s.semiology}`);
+      if (s.eegDescription) p.push(`Description: ${s.eegDescription}`);
+      L.push(`  Event ${i + 1}: ${p.join(" | ")}`);
+    });
+  } else L.push("No electrographic seizures are captured during this recording.");
+  if (r.seizures.images?.length) L.push(`  [${r.seizures.images.length} EEG screenshot(s) attached]`);
+  L.push("");
+  if (r.type === "icu" && r.icuDetails.trendSummary) { L.push("TREND SUMMARY:"); L.push(r.icuDetails.trendSummary); L.push(""); }
+  L.push("IMPRESSION:");
+  if (r.impression.classification) L.push(`This is ${r.impression.classification === "Abnormal" ? "an ABNORMAL" : "a NORMAL"} ${r.type === "routine" ? "EEG" : r.type === "ltm" ? "long-term EEG monitoring study" : "continuous EEG monitoring study"}.`);
+  if (r.impression.abnormalities?.length) L.push(`Abnormalities include: ${r.impression.abnormalities.join(", ")}.`);
+  L.push(""); L.push("CLINICAL CORRELATION:"); L.push(r.impression.clinicalCorrelation || "___");
+  if (r.impression.additionalComments) { L.push(""); L.push("ADDITIONAL COMMENTS:"); L.push(r.impression.additionalComments); }
+  return L.join("\n");
+}
+
+function Preview({ report }) {
+  const n = genNarr(report);
+  const secs = n.split("\n\n");
+  const allImgs = [
+    ...(report.background.images || []).map(i => ({ ...i, section: "Background" })),
+    ...(report.epileptiform.images || []).map(i => ({ ...i, section: "Epileptiform Activity" })),
+    ...(report.periodic.images || []).map(i => ({ ...i, section: "Periodic & Rhythmic Patterns" })),
+    ...(report.focalSlowing.images || []).map(i => ({ ...i, section: "Slowing" })),
+    ...(report.seizures.images || []).map(i => ({ ...i, section: "Seizures / Events" })),
+  ];
+  return (
+    <div style={S.prev} id="report-preview">
+      <div style={S.pH}>
+        <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
+          {report.type === "routine" ? "Electroencephalogram Report" : report.type === "ltm" ? "Long-Term EEG Monitoring Report" : "Continuous EEG Monitoring Report"}
+        </div>
+        <div style={S.pH1}>EEG REPORT</div>
+        <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>ACNS Standardized Terminology</div>
+      </div>
+      {report.patient.name && (
+        <div style={{ marginBottom: 20, padding: "12px 16px", background: "#f8f9fa", borderRadius: 8 }}>
+          <div style={S.pF}><span style={S.pL}>Patient Name:</span><span>{report.patient.name}</span></div>
+          {report.patient.sex && <div style={S.pF}><span style={S.pL}>Sex:</span><span>{report.patient.sex}</span></div>}
+          {report.patient.mrn && <div style={S.pF}><span style={S.pL}>MRN:</span><span>{report.patient.mrn}</span></div>}
+          {report.patient.dob && <div style={S.pF}><span style={S.pL}>Date of Birth:</span><span>{report.patient.dob}</span></div>}
+          {report.patient.referringPhysician && <div style={S.pF}><span style={S.pL}>Referring Physician:</span><span>{report.patient.referringPhysician}</span></div>}
+          {report.patient.indication && <div style={S.pF}><span style={S.pL}>Indication:</span><span>{report.patient.indication}</span></div>}
+        </div>
+      )}
+      {secs.map((sec, i) => {
+        const ls = sec.split("\n");
+        const isH = ls[0]?.endsWith(":") && ls[0] === ls[0].toUpperCase();
+        return isH ? <div key={i}><div style={S.pH2}>{ls[0].replace(":", "")}</div><div style={{ whiteSpace: "pre-wrap" }}>{ls.slice(1).join("\n")}</div></div>
+          : <div key={i} style={{ whiteSpace: "pre-wrap", marginBottom: 8 }}>{sec}</div>;
+      })}
+      {allImgs.length > 0 && (
+        <div>
+          <div style={S.pH2}>EEG SCREENSHOTS</div>
+          {allImgs.map((img, idx) => (
+            <div key={idx} style={{ marginBottom: 16, textAlign: "center" }}>
+              <img src={img.src} alt={img.caption || img.section} style={{ maxWidth: "100%", borderRadius: 6, border: "1px solid #ddd" }} />
+              <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}><em>{img.section}{img.caption ? ` \u2014 ${img.caption}` : ""}</em></div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ marginTop: 40, borderTop: "1px solid #ddd", paddingTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, fontSize: 12, color: "#888" }}>
+        <div><div style={{ fontWeight: 600, color: "#555", marginBottom: 4 }}>Interpreting Physician</div><div style={{ borderBottom: "1px solid #ccc", paddingBottom: 24, marginBottom: 4 }}></div><div>Signature / Date</div></div>
+        <div><div style={{ fontWeight: 600, color: "#555", marginBottom: 4 }}>Technologist</div><div style={{ borderBottom: "1px solid #ccc", paddingBottom: 24, marginBottom: 4 }}></div><div>Signature / Date</div></div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [rpt, setRpt] = useState(defReport());
+  const [view, setView] = useState("entry");
+
+  const u = useCallback((path, value) => {
+    setRpt(prev => {
+      const n = JSON.parse(JSON.stringify(prev));
+      const k = path.split("."); let o = n;
+      for (let i = 0; i < k.length - 1; i++) o = o[k[i]];
+      o[k[k.length - 1]] = value; return n;
+    });
+  }, []);
+
+  const addDis = () => u("epileptiform.discharges", [...rpt.epileptiform.discharges, defDis()]);
+  const rmDis = (i) => u("epileptiform.discharges", rpt.epileptiform.discharges.filter((_, x) => x !== i));
+  const upDis = (i, f, v) => { const d = [...rpt.epileptiform.discharges]; d[i] = { ...d[i], [f]: v }; u("epileptiform.discharges", d); };
+  const addSz = () => u("seizures.events", [...rpt.seizures.events, defSz()]);
+  const rmSz = (i) => u("seizures.events", rpt.seizures.events.filter((_, x) => x !== i));
+  const upSz = (i, f, v) => { const d = [...rpt.seizures.events]; d[i] = { ...d[i], [f]: v }; u("seizures.events", d); };
+
+  const doPrint = () => {
+    const c = document.getElementById("report-preview"); if (!c) return;
+    const w = window.open("", "_blank");
+    w.document.write(`<!DOCTYPE html><html><head><title>EEG Report</title><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;600;700&display=swap" rel="stylesheet"><style>body{font-family:'IBM Plex Serif',Georgia,serif;margin:40px;color:#1a1a1a;font-size:13px;line-height:1.7}img{max-width:100%;page-break-inside:avoid}@media print{body{margin:20px}}</style></head><body>${c.innerHTML}</body></html>`);
+
+```
+w.document.close(); setTimeout(() => w.print(), 500);
+```
+
+};
+
+const doReset = () => { if (confirm(“Reset all fields? This cannot be undone.”)) setRpt(defReport()); };
+
+const [toast, setToast] = useState(null);
+const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
+
+const quickN = () => {
+setRpt(prev => {
+const next = { …prev };
+next.background = { pdr: “9 Hz — Alpha”, voltage: “Medium (20-70 µV)”, symmetry: “Symmetric”, reactivity: “Reactive”, continuity: “Continuous”, apReactivity: “Present and symmetric”, images: (prev.background && prev.background.images) ? prev.background.images : [] };
+next.sleep = { captured: “yes”, features: [“Normal sleep transients present”] };
+next.activations = { hv: “No change”, ips: “Symmetric photic driving” };
+next.epileptiform = { present: “no”, discharges: [], images: (prev.epileptiform && prev.epileptiform.images) ? prev.epileptiform.images : [] };
+next.periodic = { pattern: “None”, frequency: “”, modifier: “None”, location: “”, images: (prev.periodic && prev.periodic.images) ? prev.periodic.images : [] };
+next.rhythmic = { pattern: “None”, location: “” };
+next.focalSlowing = { type: “None”, location: “”, images: (prev.focalSlowing && prev.focalSlowing.images) ? prev.focalSlowing.images : [] };
+next.generalizedSlowing = { type: “None” };
+next.seizures = { present: “no”, events: [], images: (prev.seizures && prev.seizures.images) ? prev.seizures.images : [] };
+next.impression = { classification: “Normal”, abnormalities: [], clinicalCorrelation: “This is a normal EEG. A normal EEG does not exclude the diagnosis of epilepsy or other intermittent neurological conditions.”, additionalComments: “” };
+return next;
+});
+setView(“narrative”);
+showToast(“Normal EEG template applied — review the narrative below”);
+};
+
+return (
+<div style={S.app}>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;600;700&display=swap" rel="stylesheet" />
+<div style={S.header}>
+<div style={S.logo}><div style={S.logoIcon}>⚡</div><div><div style={S.logoText}>NeuroReport</div><div style={S.logoSub}>EEG Report Generator</div></div></div>
+<div style={{ display: “flex”, gap: 8 }}>
+<button style={S.bs} onClick={quickN}>⚡ Quick Normal</button>
+<button style={S.bs} onClick={doReset}>↺ Reset</button>
+{view === “preview” && <button style={S.bp} onClick={doPrint}>🖨 Print / PDF</button>}
+</div>
+</div>
+<div style={S.container}>
+{toast && (
+<div style={{ position: “fixed”, top: 72, left: “50%”, transform: “translateX(-50%)”, background: COLORS.success, color: “#000”, padding: “10px 24px”, borderRadius: 8, fontSize: 13, fontWeight: 600, zIndex: 200, boxShadow: “0 4px 20px rgba(74,222,128,0.3)”, animation: “none” }}>
+{toast}
+</div>
+)}
+<div style={S.rtTabs}>
+{[[“routine”, “Routine EEG”], [“ltm”, “LTM / EMU”], [“icu”, “ICU / cEEG”]].map(([k, l]) => (
+<button key={k} style={S.rtTab(rpt.type === k)} onClick={() => setRpt(p => ({ …p, type: k }))}>{l}</button>
+))}
+</div>
+<div style={S.tabs}>
+{[[“entry”, “📝 Data Entry”], [“narrative”, “📄 Narrative”], [“preview”, “👁 Report Preview”]].map(([k, l]) => (
+<button key={k} style={S.tab(view === k)} onClick={() => setView(k)}>{l}</button>
+))}
+</div>
+
+```
+    {view === "entry" && (<div>
+      <Sec title="Patient Information" defaultOpen>
+        <div style={S.r3}>
+          <Field label="Patient Name"><input style={S.inp} value={rpt.patient.name} onChange={e => u("patient.name", e.target.value)} placeholder="Last, First" /></Field>
+          <Field label="MRN"><input style={S.inp} value={rpt.patient.mrn} onChange={e => u("patient.mrn", e.target.value)} placeholder="Medical Record Number" /></Field>
+          <Field label="Sex"><Sel value={rpt.patient.sex} onChange={v => u("patient.sex", v)} options={ACNS_TERMINOLOGY.sex} /></Field>
+        </div>
+        <div style={S.r2}>
+          <Field label="Date of Birth"><input style={S.inp} type="date" value={rpt.patient.dob} onChange={e => u("patient.dob", e.target.value)} /></Field>
+          <Field label="Referring Physician"><input style={S.inp} value={rpt.patient.referringPhysician} onChange={e => u("patient.referringPhysician", e.target.value)} /></Field>
+        </div>
+        <Field label="Indication"><input style={S.inp} value={rpt.patient.indication} onChange={e => u("patient.indication", e.target.value)} placeholder="e.g., Evaluation for seizures, altered mental status" /></Field>
+        <Field label="Relevant History"><textarea style={S.ta} value={rpt.patient.relevantHistory} onChange={e => u("patient.relevantHistory", e.target.value)} placeholder="Brief relevant clinical history..." /></Field>
+      </Sec>
+
+      <Sec title="Technical Parameters" defaultOpen>
+        <div style={S.r2}>
+          <Field label="Recording Duration"><Sel value={rpt.technical.duration} onChange={v => u("technical.duration", v)} options={ACNS_TERMINOLOGY.recordingDuration} /></Field>
+          <Field label="Activation Procedures"><MS selected={rpt.technical.activationProcedures} onChange={v => u("technical.activationProcedures", v)} options={ACNS_TERMINOLOGY.activationProcedures} /></Field>
+        </div>
+        <Field label="Current Medications"><MS selected={rpt.technical.medications} onChange={v => u("technical.medications", v)} options={ACNS_TERMINOLOGY.medications} /></Field>
+        <Field label="Technologist Comments"><textarea style={S.ta} value={rpt.technical.techComments} onChange={e => u("technical.techComments", e.target.value)} placeholder="Additional technical notes..." /></Field>
+      </Sec>
+
+      {rpt.type === "icu" && (
+        <Sec title="ICU / Patient State" badge="cEEG" defaultOpen>
+          <div style={S.r2}>
+            <Field label="Patient State"><Sel value={rpt.icuDetails.patientState} onChange={v => u("icuDetails.patientState", v)} options={ACNS_TERMINOLOGY.patientState} /></Field>
+            <Field label="Sedation"><input style={S.inp} value={rpt.icuDetails.sedation} onChange={e => u("icuDetails.sedation", e.target.value)} placeholder="e.g., Propofol 50 mcg/kg/min" /></Field>
+          </div>
+          <Field label="Stimulation Testing"><textarea style={S.ta} value={rpt.icuDetails.stimTesting} onChange={e => u("icuDetails.stimTesting", e.target.value)} placeholder="Describe stimulation testing and response..." /></Field>
+          <Field label="Trend Summary"><textarea style={{ ...S.ta, minHeight: 100 }} value={rpt.icuDetails.trendSummary} onChange={e => u("icuDetails.trendSummary", e.target.value)} placeholder="Summary of EEG trends over the monitoring period..." /></Field>
+        </Sec>
+      )}
+
+      <Sec title="Background Activity" badge="ACNS">
+        <div style={S.r2}>
+          <Field label="Posterior Dominant Rhythm"><Sel value={rpt.background.pdr} onChange={v => u("background.pdr", v)} options={ACNS_TERMINOLOGY.pdrFrequency} /></Field>
+          <Field label="Voltage"><Sel value={rpt.background.voltage} onChange={v => u("background.voltage", v)} options={ACNS_TERMINOLOGY.voltage} /></Field>
+        </div>
+        <div style={S.r3}>
+          <Field label="Symmetry"><Sel value={rpt.background.symmetry} onChange={v => u("background.symmetry", v)} options={ACNS_TERMINOLOGY.symmetry} /></Field>
+          <Field label="Reactivity"><Sel value={rpt.background.reactivity} onChange={v => u("background.reactivity", v)} options={ACNS_TERMINOLOGY.reactivity} /></Field>
+          <Field label="Continuity"><Sel value={rpt.background.continuity} onChange={v => u("background.continuity", v)} options={ACNS_TERMINOLOGY.continuity} /></Field>
+        </div>
+        <Field label="AP Gradient"><Sel value={rpt.background.apReactivity} onChange={v => u("background.apReactivity", v)} options={ACNS_TERMINOLOGY.apReactivity} /></Field>
+        <ImgAttach label="Background EEG Screenshots" images={rpt.background.images} onChange={v => u("background.images", v)} />
+      </Sec>
+
+      <Sec title="Sleep Architecture">
+        <Field label="Sleep Captured">
+          <div style={{ display: "flex", gap: 12 }}>
+            {["yes", "no"].map(v => (<label key={v} style={S.cb}><input type="radio" name="sleep" checked={rpt.sleep.captured === v} onChange={() => u("sleep.captured", v)} /> {v === "yes" ? "Yes" : "No"}</label>))}
+          </div>
+        </Field>
+        {rpt.sleep.captured === "yes" && <Field label="Sleep Features"><MS selected={rpt.sleep.features} onChange={v => u("sleep.features", v)} options={ACNS_TERMINOLOGY.sleepArchitecture.slice(1)} /></Field>}
+      </Sec>
+
+      {rpt.type === "routine" && (
+        <Sec title="Activation Procedures">
+          <div style={S.r2}>
+            <Field label="Hyperventilation"><Sel value={rpt.activations.hv} onChange={v => u("activations.hv", v)} options={ACNS_TERMINOLOGY.hvResponse} /></Field>
+            <Field label="Intermittent Photic Stimulation"><Sel value={rpt.activations.ips} onChange={v => u("activations.ips", v)} options={ACNS_TERMINOLOGY.ipsResponse} /></Field>
+          </div>
+        </Sec>
+      )}
+
+      <Sec title="Epileptiform Activity" badge="ACNS">
+        <Field label="Epileptiform Discharges Present">
+          <div style={{ display: "flex", gap: 12 }}>
+            {["yes", "no"].map(v => (<label key={v} style={S.cb}><input type="radio" name="epi" checked={rpt.epileptiform.present === v} onChange={() => { u("epileptiform.present", v); if (v === "yes" && !rpt.epileptiform.discharges.length) addDis(); }} /> {v === "yes" ? "Yes" : "No"}</label>))}
+          </div>
+        </Field>
+        {rpt.epileptiform.present === "yes" && (<>
+          {rpt.epileptiform.discharges.map((d, i) => (
+            <div key={i} style={S.eCard}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.accent }}>Discharge #{i + 1}</span>
+                <button style={S.rmB} onClick={() => rmDis(i)}>✕ Remove</button>
+              </div>
+              <div style={S.r2}>
+                <Field label="Morphology"><Sel value={d.morphology} onChange={v => upDis(i, "morphology", v)} options={ACNS_TERMINOLOGY.epileptiformMorphology} /></Field>
+                <Field label="Location"><Sel value={d.location} onChange={v => upDis(i, "location", v)} options={ACNS_TERMINOLOGY.epileptiformLocation} /></Field>
+              </div>
+              <div style={S.r2}>
+                <Field label="Frequency"><Sel value={d.frequency} onChange={v => upDis(i, "frequency", v)} options={ACNS_TERMINOLOGY.epileptiformFrequency} /></Field>
+                <Field label="Distribution"><Sel value={d.distribution} onChange={v => upDis(i, "distribution", v)} options={ACNS_TERMINOLOGY.epileptiformDistribution} /></Field>
+              </div>
+            </div>
+          ))}
+          <button style={S.addB} onClick={addDis}>+ Add Discharge</button>
+        </>)}
+        <ImgAttach label="Epileptiform Activity EEG Screenshots" images={rpt.epileptiform.images} onChange={v => u("epileptiform.images", v)} />
+      </Sec>
+
+      <Sec title="Periodic & Rhythmic Patterns" badge="ACNS">
+        <div style={S.r2}>
+          <Field label="Periodic Pattern"><Sel value={rpt.periodic.pattern} onChange={v => u("periodic.pattern", v)} options={ACNS_TERMINOLOGY.periodicPattern} /></Field>
+          {rpt.periodic.pattern !== "None" && <Field label="Frequency"><Sel value={rpt.periodic.frequency} onChange={v => u("periodic.frequency", v)} options={ACNS_TERMINOLOGY.periodicFrequency} /></Field>}
+        </div>
+        {rpt.periodic.pattern !== "None" && (
+          <div style={S.r2}>
+            <Field label="Modifier"><Sel value={rpt.periodic.modifier} onChange={v => u("periodic.modifier", v)} options={ACNS_TERMINOLOGY.periodicModifier} /></Field>
+            <Field label="Location"><Sel value={rpt.periodic.location} onChange={v => u("periodic.location", v)} options={ACNS_TERMINOLOGY.epileptiformLocation} /></Field>
+          </div>
+        )}
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${COLORS.border}` }}>
+          <div style={S.r2}>
+            <Field label="Rhythmic Pattern"><Sel value={rpt.rhythmic.pattern} onChange={v => u("rhythmic.pattern", v)} options={ACNS_TERMINOLOGY.rhythmicPattern} /></Field>
+            {rpt.rhythmic.pattern !== "None" && <Field label="Location"><Sel value={rpt.rhythmic.location} onChange={v => u("rhythmic.location", v)} options={ACNS_TERMINOLOGY.slowingLocation} /></Field>}
+          </div>
+        </div>
+        <ImgAttach label="Periodic/Rhythmic Pattern EEG Screenshots" images={rpt.periodic.images} onChange={v => u("periodic.images", v)} />
+      </Sec>
+
+      <Sec title="Slowing">
+        <div style={S.r2}>
+          <Field label="Focal Slowing"><Sel value={rpt.focalSlowing.type} onChange={v => u("focalSlowing.type", v)} options={ACNS_TERMINOLOGY.focalSlowing} /></Field>
+          {rpt.focalSlowing.type !== "None" && <Field label="Location"><Sel value={rpt.focalSlowing.location} onChange={v => u("focalSlowing.location", v)} options={ACNS_TERMINOLOGY.slowingLocation} /></Field>}
+        </div>
+        <Field label="Generalized Slowing"><Sel value={rpt.generalizedSlowing.type} onChange={v => u("generalizedSlowing.type", v)} options={ACNS_TERMINOLOGY.generalizedSlowing} /></Field>
+        <ImgAttach label="Slowing EEG Screenshots" images={rpt.focalSlowing.images} onChange={v => u("focalSlowing.images", v)} />
+      </Sec>
+
+      <Sec title="Seizures / Events" badge="ILAE 2017">
+        <Field label="Seizures Captured">
+          <div style={{ display: "flex", gap: 12 }}>
+            {["yes", "no"].map(v => (<label key={v} style={S.cb}><input type="radio" name="sz" checked={rpt.seizures.present === v} onChange={() => { u("seizures.present", v); if (v === "yes" && !rpt.seizures.events.length) addSz(); }} /> {v === "yes" ? "Yes" : "No"}</label>))}
+          </div>
+        </Field>
+        {rpt.seizures.present === "yes" && (<>
+          {rpt.seizures.events.map((s, i) => (
+            <div key={i} style={S.eCard}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.warning }}>Event #{i + 1}</span>
+                <button style={S.rmB} onClick={() => rmSz(i)}>✕ Remove</button>
+              </div>
+              <div style={S.r2}>
+                <Field label="Seizure Classification (ILAE 2017)"><Sel value={s.type} onChange={v => upSz(i, "type", v)} options={ACNS_TERMINOLOGY.seizureType} placeholder="Select classification..." /></Field>
+                <Field label="EEG Onset Location"><Sel value={s.onset} onChange={v => upSz(i, "onset", v)} options={ACNS_TERMINOLOGY.seizureOnset} /></Field>
+              </div>
+              <div style={S.r3}>
+                <Field label="Duration"><Sel value={s.duration} onChange={v => upSz(i, "duration", v)} options={ACNS_TERMINOLOGY.seizureDuration} /></Field>
+                <Field label="EEG Pattern"><Sel value={s.eegPattern} onChange={v => upSz(i, "eegPattern", v)} options={ACNS_TERMINOLOGY.seizureEEGPattern} /></Field>
+                <Field label="Evolution"><Sel value={s.evolution} onChange={v => upSz(i, "evolution", v)} options={ACNS_TERMINOLOGY.seizureEvolution} /></Field>
+              </div>
+              <div style={S.r2}>
+                <Field label="Seizure Ending"><Sel value={s.ending} onChange={v => upSz(i, "ending", v)} options={ACNS_TERMINOLOGY.seizureEnd} /></Field>
+                <Field label="Semiology"><Sel value={s.semiology} onChange={v => upSz(i, "semiology", v)} options={ACNS_TERMINOLOGY.seizureSemiology} /></Field>
+              </div>
+              <Field label="EEG Description (free text)"><textarea style={S.ta} value={s.eegDescription} onChange={e => upSz(i, "eegDescription", e.target.value)} placeholder="Describe the ictal EEG pattern, evolution, and post-ictal features..." /></Field>
+            </div>
+          ))}
+          <button style={S.addB} onClick={addSz}>+ Add Seizure Event</button>
+        </>)}
+        <ImgAttach label="Seizure / Event EEG Screenshots" images={rpt.seizures.images} onChange={v => u("seizures.images", v)} />
+      </Sec>
+
+      <Sec title="Impression & Clinical Correlation" defaultOpen>
+        <Field label="Overall Classification">
+          <div style={{ display: "flex", gap: 12 }}>
+            {["Normal", "Abnormal"].map(v => (<label key={v} style={S.cb}><input type="radio" name="imp" checked={rpt.impression.classification === v} onChange={() => u("impression.classification", v)} /> {v}</label>))}
+          </div>
+        </Field>
+        {rpt.impression.classification === "Abnormal" && <Field label="Abnormalities"><MS selected={rpt.impression.abnormalities} onChange={v => u("impression.abnormalities", v)} options={ACNS_TERMINOLOGY.abnormalityType} /></Field>}
+        <Field label="Clinical Correlation"><textarea style={{ ...S.ta, minHeight: 80 }} value={rpt.impression.clinicalCorrelation} onChange={e => u("impression.clinicalCorrelation", e.target.value)} placeholder="Provide clinical correlation and interpretation..." /></Field>
+        <Field label="Additional Comments"><textarea style={S.ta} value={rpt.impression.additionalComments} onChange={e => u("impression.additionalComments", e.target.value)} placeholder="Optional additional comments..." /></Field>
+      </Sec>
+    </div>)}
+
+    {view === "narrative" && (<div>
+      <div style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 13, color: COLORS.textSecondary }}>Auto-generated from structured data using ACNS standardized terminology</span>
+        <button style={S.bs} onClick={() => navigator.clipboard.writeText(genNarr(rpt))}>📋 Copy Text</button>
+      </div>
+      <div style={S.narr}>{genNarr(rpt)}</div>
+    </div>)}
+
+    {view === "preview" && (<div>
+      <div style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 13, color: COLORS.textSecondary }}>Formatted report preview — use Print / PDF button to export</span>
+        <button style={S.bp} onClick={doPrint}>🖨 Print / Export PDF</button>
+      </div>
+      <Preview report={rpt} />
+    </div>)}
+  </div>
+</div>
+```
+
+);
+}
+
+try {
+const root = ReactDOM.createRoot(document.getElementById(‘root’));
+root.render(React.createElement(App));
+document.getElementById(‘loading’).style.display = ‘none’;
+} catch(e) {
+document.getElementById(‘loading’).innerHTML = ‘<div style="color:#F87171;padding:20px;text-align:center"><h3>Error loading app</h3><pre style="font-size:11px;text-align:left;max-width:90vw;overflow:auto">’ + e.message + ‘</pre></div>’;
+}
+</script>
+
+<script>
+// Hide loading once Babel finishes
+window.addEventListener('load', function() {
+  setTimeout(function() {
+    var el = document.getElementById('loading');
+    if (el) el.style.display = 'none';
+  }, 3000);
+});
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+
+</body>
+</html>
