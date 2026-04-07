@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NeuroReport">
+<meta name="theme-color" content="#5B8DEF">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>NeuroReport</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0F1117;overflow-y:scroll;-webkit-overflow-scrolling:touch}
+select,input,textarea,button{font-family:inherit}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script>
+"use strict";
+var e = React.createElement;
+var useState = React.useState;
+var useCallback = React.useCallback;
+var useRef = React.useRef;
+
+var ACNS = {
+sex: [“Male”, “Female”, “Other”, “Unknown”],
+pdrFrequency: [“No discernible PDR”,“4 Hz \u2014 Theta”,“5 Hz \u2014 Theta”,“6 Hz \u2014 Theta”,“7 Hz \u2014 Theta”,“8 Hz \u2014 Alpha”,“8.5 Hz \u2014 Alpha”,“9 Hz \u2014 Alpha”,“9.5 Hz \u2014 Alpha”,“10 Hz \u2014 Alpha”,“10.5 Hz \u2014 Alpha”,“11 Hz \u2014 Alpha”,“12 Hz \u2014 Alpha”,“13 Hz \u2014 Alpha / Beta border”],
+voltage: [“Low (<20 \u00B5V)”, “Medium (20-70 \u00B5V)”, “High (>70 \u00B5V)”],
+symmetry: [“Symmetric”, “Asymmetric - higher amplitude left”, “Asymmetric - higher amplitude right”],
+reactivity: [“Reactive”, “Not reactive”, “Not tested”],
+apReactivity: [“Present and symmetric”, “Present and asymmetric”, “Absent”],
+continuity: [“Continuous”, “Nearly continuous”, “Discontinuous”, “Burst-suppression”, “Burst-attenuation”, “Suppression (<10 \u00B5V)”, “Electrocerebral inactivity”],
+sleepArch: [“Normal sleep transients present”, “Abnormal sleep architecture”, “Sleep spindles present”, “K-complexes present”, “Vertex waves present”, “REM sleep captured”],
+epiMorph: [“Spikes”, “Sharp waves”, “Spike-and-wave”, “Polyspike”, “Polyspike-and-wave”, “Sharp-and-slow-wave”],
+epiLoc: [“Fp1”,“Fp2”,“F3”,“F4”,“C3”,“C4”,“P3”,“P4”,“O1”,“O2”,“F7”,“F8”,“T3/T7”,“T4/T8”,“T5/P7”,“T6/P8”,“Fz”,“Cz”,“Pz”,“Left frontal”,“Right frontal”,“Left temporal”,“Right temporal”,“Left parietal”,“Right parietal”,“Left occipital”,“Right occipital”,“Left frontotemporal”,“Right frontotemporal”,“Left centrotemporal”,“Right centrotemporal”,“Left posterior temporal”,“Right posterior temporal”,“Bifrontal”,“Bitemporal”,“Generalized”,“Multifocal”],
+epiFreq: [“Rare (<1/hr)”, “Occasional (1/hr to <1/min)”, “Frequent (\u22651/min to <1/10s)”, “Abundant (\u22651/10s)”, “Very abundant (nearly continuous)”],
+epiDist: [“Focal”, “Multifocal”, “Generalized”, “Lateralized”, “Bilateral independent”],
+periodicPat: [“None”,“GPDs (Generalized Periodic Discharges)”,“LPDs (Lateralized Periodic Discharges)”,“BIPDs (Bilateral Independent Periodic Discharges)”,“SIRPIDS (Stimulus-Induced Rhythmic, Periodic, or Ictal Discharges)”],
+periodicFreq: [”<0.5 Hz”,“0.5-1 Hz”,“1-2 Hz”,“2-3 Hz”,”>3 Hz”],
+periodicMod: [“None”,”+R (with rhythmic activity)”,”+F (with fast activity)”,”+S (with sharp component)”,”+FR (with fast and rhythmic)”],
+rhythmicPat: [“None”,“GRDA (Generalized Rhythmic Delta Activity)”,“LRDA (Lateralized Rhythmic Delta Activity)”,“FIRDA”,“TIRDA”,“OIRDA”],
+focalSlow: [“None”,“Intermittent focal slowing”,“Continuous focal slowing”,“Polymorphic delta activity”,“Intermittent rhythmic delta activity”],
+slowLoc: [“Left frontal”,“Right frontal”,“Left temporal”,“Right temporal”,“Left parietal”,“Right parietal”,“Left occipital”,“Right occipital”,“Left hemisphere”,“Right hemisphere”,“Bifrontal”,“Bitemporal”,“Generalized”],
+genSlow: [“None”,“Mild generalized slowing”,“Moderate generalized slowing”,“Severe generalized slowing”,“Diffuse background attenuation”],
+hvResp: [“Not performed”,“No change”,“Symmetric slowing”,“Asymmetric slowing”,“Provoked epileptiform discharges”,“Provoked seizure”],
+ipsResp: [“Not performed”,“No photic driving”,“Symmetric photic driving”,“Asymmetric photic driving”,“Photoparoxysmal response”,“Photomyogenic response”],
+szType: [”\u2014 FOCAL ONSET \u2014”,“Focal onset - aware”,“Focal onset - impaired awareness”,“Focal onset - awareness unknown”,“Focal to bilateral tonic-clonic”,”\u2014 Focal Motor \u2014”,“Focal motor - automatisms”,“Focal motor - atonic”,“Focal motor - clonic”,“Focal motor - epileptic spasms”,“Focal motor - hyperkinetic”,“Focal motor - myoclonic”,“Focal motor - tonic”,”\u2014 Focal Non-Motor \u2014”,“Focal non-motor - autonomic”,“Focal non-motor - behavior arrest”,“Focal non-motor - cognitive”,“Focal non-motor - emotional”,“Focal non-motor - sensory”,”\u2014 GENERALIZED ONSET \u2014”,“Generalized motor - tonic-clonic”,“Generalized motor - tonic”,“Generalized motor - clonic”,“Generalized motor - myoclonic”,“Generalized motor - myoclonic-tonic-clonic”,“Generalized motor - myoclonic-atonic”,“Generalized motor - atonic”,“Generalized motor - epileptic spasms”,”\u2014 Generalized Non-Motor (Absence) \u2014”,“Generalized non-motor - typical absence”,“Generalized non-motor - atypical absence”,“Generalized non-motor - myoclonic absence”,“Generalized non-motor - eyelid myoclonia”,”\u2014 UNKNOWN ONSET \u2014”,“Unknown onset - motor - tonic-clonic”,“Unknown onset - motor - epileptic spasms”,“Unknown onset - non-motor - behavior arrest”,“Unknown onset”,”\u2014 OTHER \u2014”,“Electrographic only (subclinical)”,“Status epilepticus - focal”,“Status epilepticus - generalized convulsive”,“Status epilepticus - generalized non-convulsive”,“Status epilepticus - unknown”,“Unclassified”],
+szSem: [“No clinical correlate (subclinical)”,“Behavioral arrest”,“Automatisms - oroalimentary”,“Automatisms - manual/gestural”,“Automatisms - leg pedaling/bicycling”,“Automatisms - perseverative”,“Automatisms - hyperkinetic”,“Tonic posturing - unilateral”,“Tonic posturing - bilateral”,“Tonic posturing - figure of 4”,“Clonic movements - focal”,“Clonic movements - bilateral”,“Tonic-clonic”,“Myoclonic jerks - focal”,“Myoclonic jerks - generalized”,“Atonic / drop attack”,“Epileptic spasms”,“Versive - head”,“Versive - eye”,“Aphasia / speech arrest”,“Autonomic - ictal tachycardia”,“Autonomic - ictal bradycardia”,“Autonomic - apnea”,“Autonomic - emesis”,“Autonomic - piloerection”,“Sensory - somatosensory”,“Sensory - visual”,“Sensory - auditory”,“Sensory - olfactory/gustatory”,“Emotional - fear/anxiety”,“Emotional - laughing (gelastic)”,“Emotional - crying (dacrystic)”,“Cognitive - deja vu / jamais vu”,“Cognitive - hallucinations”,“Cognitive - forced thinking”,“Aura only”,“Other”],
+szOnset: [“Left frontal”,“Right frontal”,“Left temporal”,“Right temporal”,“Left parietal”,“Right parietal”,“Left occipital”,“Right occipital”,“Left frontotemporal”,“Right frontotemporal”,“Left centrotemporal”,“Right centrotemporal”,“Left posterior temporal”,“Right posterior temporal”,“Left frontoparietal”,“Right frontoparietal”,“Left temporo-occipital”,“Right temporo-occipital”,“Left hemisphere (diffuse)”,“Right hemisphere (diffuse)”,“Bilateral frontal”,“Bilateral temporal”,“Generalized”,“Diffuse”,“Midline (vertex/Cz)”,“Obscured by artifact”,“Unable to determine”],
+szEvol: [“Not applicable”,“Remained focal”,“Focal to bilateral (secondary generalization)”,“Evolved in frequency”,“Evolved in distribution”,“Evolved in morphology”,“Fluctuating”,“Static”],
+szEnd: [“Abrupt cessation”,“Gradual offset”,“Post-ictal suppression - focal”,“Post-ictal suppression - generalized”,“Post-ictal slowing - focal”,“Post-ictal slowing - generalized”,“Terminated with intervention (medication)”,“Terminated with stimulation”,“Unclear offset”],
+szDur: [”<10 seconds”,“10-30 seconds”,“30-60 seconds”,“1-2 minutes”,“2-5 minutes”,“5-10 minutes”,”>10 minutes”,“Continuous (status epilepticus)”],
+szEEG: [“Rhythmic theta activity”,“Rhythmic delta activity”,“Rhythmic alpha activity”,“Rhythmic beta activity”,“Spike-and-wave”,“Polyspike-and-wave”,“Low voltage fast activity”,“Electrodecremental pattern”,“Repetitive sharp waves”,“Repetitive spikes”,“Generalized paroxysmal fast activity (GPFA)”,“Hypsarrhythmia with electrodecrement”,“Other”],
+abnType: [“Epileptiform discharges”,“Electrographic seizures”,“Focal slowing”,“Generalized slowing”,“Periodic discharges”,“Rhythmic delta activity”,“Background asymmetry”,“Burst suppression”,“Electrocerebral inactivity”,“Excess beta activity”,“Breach rhythm”],
+patState: [“Awake”,“Drowsy”,“Asleep”,“Obtunded”,“Comatose”,“Sedated”,“Pharmacologically paralyzed”,“Post-ictal”],
+meds: [“None documented”,“Levetiracetam”,“Phenytoin/Fosphenytoin”,“Lacosamide”,“Valproic acid”,“Carbamazepine”,“Oxcarbazepine”,“Lamotrigine”,“Topiramate”,“Zonisamide”,“Phenobarbital”,“Midazolam drip”,“Propofol drip”,“Pentobarbital drip”,“Ketamine drip”,“Lorazepam”,“Diazepam”,“Clobazam”,“Brivaracetam”,“Perampanel”,“Cenobamate”,“Cannabidiol”,“Other”],
+actProc: [“Hyperventilation”,“Intermittent photic stimulation”,“Sleep deprivation”,“None performed”],
+recDur: [“20 minutes”,“30 minutes”,“40 minutes”,“60 minutes”,“2 hours”,“4 hours”,“8 hours”,“12 hours”,“24 hours”,“48 hours”,“72 hours”,“5 days”,“7 days”,“Other”]
+};
+
+var CL = {bg:”#0F1117”,srf:”#181B25”,sAlt:”#1E2231”,brd:”#2A2F3F”,acc:”#5B8DEF”,aDim:“rgba(91,141,239,0.12)”,txt:”#E8EAF0”,tSec:”#8B90A0”,tMut:”#5A5F72”,ok:”#4ADE80”,warn:”#FBBF24”,err:”#F87171”,sBg:”#141720”};
+
+var sInp = {width:“100%”,padding:“8px 12px”,borderRadius:8,border:“1px solid “+CL.brd,background:CL.sAlt,color:CL.txt,fontSize:13,outline:“none”,boxSizing:“border-box”};
+var sTa = Object.assign({},sInp,{resize:“vertical”,minHeight:60,fontFamily:“inherit”});
+var sSel = Object.assign({},sInp,{cursor:“pointer”,appearance:“auto”});
+var sR2 = {display:“grid”,gridTemplateColumns:“1fr 1fr”,gap:12};
+var sR3 = {display:“grid”,gridTemplateColumns:“1fr 1fr 1fr”,gap:12};
+var sBP = {padding:“10px 24px”,borderRadius:8,border:“none”,cursor:“pointer”,fontSize:13,fontWeight:600,background:CL.acc,color:”#fff”,display:“inline-flex”,alignItems:“center”,gap:8};
+var sBS = {padding:“10px 24px”,borderRadius:8,border:“1px solid “+CL.brd,cursor:“pointer”,fontSize:13,fontWeight:500,background:“transparent”,color:CL.tSec,display:“inline-flex”,alignItems:“center”,gap:8};
+var sCb = {display:“flex”,alignItems:“center”,gap:8,fontSize:13,color:CL.txt,cursor:“pointer”,padding:“4px 0”};
+var sEC = {background:CL.sAlt,border:“1px solid “+CL.brd,borderRadius:10,padding:16,marginBottom:10};
+
+function Fld(p) { return e(“div”,{style:{marginBottom:14}},e(“label”,{style:{display:“block”,fontSize:12,fontWeight:500,color:CL.tSec,marginBottom:5}},p.label),p.children); }
+
+function Sel(p) {
+return e(“select”,{style:sSel,value:p.value||””,onChange:function(ev){p.onChange(ev.target.value)}},
+e(“option”,{value:””,disabled:true},p.placeholder||“Select…”),
+p.options.map(function(o){var isG=o.startsWith(”\u2014”);return e(“option”,{key:o,value:o,disabled:isG,style:isG?{fontWeight:700,color:CL.acc}:{}},o)})
+);
+}
+
+function MSelect(p) {
+var sel = p.selected||[];
+return e(“div”,{style:{display:“flex”,flexWrap:“wrap”,gap:6}},
+p.options.map(function(o){var on=sel.indexOf(o)!==-1;return e(“span”,{key:o,style:{padding:“5px 12px”,borderRadius:16,border:“1px solid “+(on?CL.acc:CL.brd),cursor:“pointer”,fontSize:12,fontWeight:on?600:400,background:on?CL.aDim:“transparent”,color:on?CL.acc:CL.tSec,whiteSpace:“nowrap”},onClick:function(){p.onChange(on?sel.filter(function(s){return s!==o}):sel.concat(o))}},o)})
+);
+}
+
+function Sec(p) {
+var s = useState(p.defaultOpen||false); var open=s[0]; var setOpen=s[1];
+return e(“div”,{style:{background:CL.srf,borderRadius:12,border:“1px solid “+CL.brd,marginBottom:16,overflow:“hidden”}},
+e(“div”,{style:{padding:“14px 20px”,cursor:“pointer”,display:“flex”,alignItems:“center”,justifyContent:“space-between”,background:open?CL.sBg:“transparent”,userSelect:“none”},onClick:function(){setOpen(!open)}},
+e(“div”,{style:{fontSize:14,fontWeight:600,display:“flex”,alignItems:“center”,gap:8}},
+e(“span”,null,open?”\u25BE”:”\u25B8”),p.title,
+p.badge?e(“span”,{style:{fontSize:10,padding:“2px 8px”,borderRadius:10,background:CL.aDim,color:CL.acc,fontWeight:600}},p.badge):null
+)
+),
+open?e(“div”,{style:{padding:“16px 20px”,borderTop:“1px solid “+CL.brd}},p.children):null
+);
+}
+
+function ImgAttach(p) {
+var images = p.images||[];
+var fRef = useRef();
+var s2 = useState(null); var lb=s2[0]; var setLb=s2[1];
+function addFiles(files) {
+Array.from(files).forEach(function(f){
+if(!f.type.startsWith(“image/”))return;
+var reader = new FileReader();
+reader.onload = function(ev){p.onChange(images.concat({src:ev.target.result,name:f.name,caption:””}))};
+reader.readAsDataURL(f);
+});
+}
+return e(“div”,{style:{marginTop:10}},
+e(“label”,{style:{display:“block”,fontSize:11,fontWeight:500,color:CL.tMut,marginBottom:5}},p.label||“EEG Screenshots”),
+e(“div”,{style:{border:“2px dashed #3A3F52”,borderRadius:10,padding:“12px 16px”,display:“flex”,flexDirection:“column”,alignItems:“center”,gap:8,cursor:“pointer”,background:“rgba(91,141,239,0.04)”,minHeight:60,justifyContent:“center”},onClick:function(){fRef.current&&fRef.current.click()},onDrop:function(ev){ev.preventDefault();if(ev.dataTransfer.files&&ev.dataTransfer.files.length)addFiles(ev.dataTransfer.files)},onDragOver:function(ev){ev.preventDefault()},tabIndex:0},
+e(“input”,{ref:fRef,type:“file”,accept:“image/*”,multiple:true,style:{display:“none”},onChange:function(ev){addFiles(ev.target.files);ev.target.value=””}}),
+e(“span”,{style:{fontSize:20}},”\uD83D\uDCF7”),
+e(“span”,{style:{fontSize:12,color:CL.tSec}},“Click to upload, drag & drop, or “,e(“strong”,{style:{color:CL.acc}},“paste (Ctrl+V)”))
+),
+images.length>0?e(“div”,{style:{display:“flex”,flexWrap:“wrap”,gap:8,marginTop:8}},
+images.map(function(img,idx){return e(“div”,{key:idx,style:{position:“relative”,display:“inline-flex”,flexDirection:“column”,gap:4}},
+e(“img”,{src:img.src,style:{width:120,height:90,objectFit:“cover”,borderRadius:6,border:“1px solid “+CL.brd,cursor:“pointer”},onClick:function(){setLb(img.src)}}),
+e(“input”,{style:Object.assign({},sInp,{width:120,fontSize:10,padding:“3px 6px”}),placeholder:“Caption…”,value:img.caption,onChange:function(ev){var u=images.slice();u[idx]=Object.assign({},u[idx],{caption:ev.target.value});p.onChange(u)}}),
+e(“button”,{style:{position:“absolute”,top:-4,right:-4,width:18,height:18,borderRadius:9,background:CL.err,color:”#fff”,border:“none”,cursor:“pointer”,fontSize:10,display:“flex”,alignItems:“center”,justifyContent:“center”},onClick:function(){p.onChange(images.filter(function(_,i){return i!==idx}))}},”\u2715”)
+)})
+):null,
+lb?e(“div”,{style:{position:“fixed”,top:0,left:0,right:0,bottom:0,background:“rgba(0,0,0,0.85)”,display:“flex”,alignItems:“center”,justifyContent:“center”,zIndex:9999,cursor:“zoom-out”},onClick:function(){setLb(null)}},e(“img”,{src:lb,style:{maxWidth:“90vw”,maxHeight:“90vh”,borderRadius:8}})):null
+);
+}
+
+function defReport(){return{type:“routine”,patient:{name:””,mrn:””,dob:””,sex:””,referringPhysician:””,indication:””,relevantHistory:””},technical:{duration:””,medications:[],activationProcedures:[],techComments:””},background:{pdr:””,voltage:””,symmetry:””,reactivity:””,continuity:“Continuous”,apReactivity:””,images:[]},sleep:{captured:“no”,features:[]},activations:{hv:“Not performed”,ips:“Not performed”},epileptiform:{present:“no”,discharges:[],images:[]},periodic:{pattern:“None”,frequency:””,modifier:“None”,location:””,images:[]},rhythmic:{pattern:“None”,location:””},focalSlowing:{type:“None”,location:””,images:[]},generalizedSlowing:{type:“None”},seizures:{present:“no”,events:[],images:[]},icuDetails:{patientState:””,sedation:””,stimTesting:””,trendSummary:””},impression:{classification:””,abnormalities:[],clinicalCorrelation:””,additionalComments:””}};}
+
+function genNarr(r){var L=[];var tp=r.type===“routine”?“ROUTINE EEG REPORT”:r.type===“ltm”?“LONG-TERM MONITORING / EMU REPORT”:“ICU CONTINUOUS EEG MONITORING REPORT”;L.push(”[”+tp+”]\n”);if(r.patient.name||r.patient.mrn){var p=“Patient: “+(r.patient.name||”***”);if(r.patient.sex)p+=” | Sex: “+r.patient.sex;if(r.patient.mrn)p+=” | MRN: “+r.patient.mrn;if(r.patient.dob)p+=” | DOB: “+r.patient.dob;L.push(p);if(r.patient.referringPhysician)L.push(“Referring Physician: “+r.patient.referringPhysician);if(r.patient.indication)L.push(“Indication: “+r.patient.indication);L.push(””)}L.push(“TECHNICAL DESCRIPTION:”);var t2=[];if(r.technical.duration)t2.push(“Recording duration: “+r.technical.duration+”.”);if(r.technical.activationProcedures&&r.technical.activationProcedures.length)t2.push(“Activation procedures: “+r.technical.activationProcedures.join(”, “)+”.”);if(r.technical.medications&&r.technical.medications.length)t2.push(“Current medications: “+r.technical.medications.join(”, “)+”.”);if(r.technical.techComments)t2.push(r.technical.techComments);L.push(t2.join(” “)||“No technical details recorded.”);L.push(””);if(r.type===“icu”){L.push(“PATIENT STATE:”);var ic=[];if(r.icuDetails.patientState)ic.push(“Patient state: “+r.icuDetails.patientState+”.”);if(r.icuDetails.sedation)ic.push(“Sedation: “+r.icuDetails.sedation+”.”);if(r.icuDetails.stimTesting)ic.push(“Stimulation testing: “+r.icuDetails.stimTesting+”.”);L.push(ic.join(” “)||“Not documented.”);L.push(””)}L.push(“BACKGROUND:”);var bg=[];if(r.background.pdr&&r.background.pdr!==“No discernible PDR”){var pc=r.background.pdr.split(” \u2014 “)[0];bg.push(“The posterior dominant rhythm consists of “+pc+” activity”);if(r.background.voltage)bg.push(”, “+r.background.voltage.toLowerCase()+” in amplitude”);if(r.background.symmetry)bg.push(”, “+r.background.symmetry.toLowerCase());if(r.background.reactivity)bg.push(”, and “+r.background.reactivity.toLowerCase()+” to eye opening”);bg.push(”.”)}else if(r.background.pdr===“No discernible PDR”)bg.push(“No discernible posterior dominant rhythm is identified.”);if(r.background.continuity&&r.background.continuity!==“Continuous”)bg.push(” The background is “+r.background.continuity.toLowerCase()+”.”);else if(r.background.continuity===“Continuous”)bg.push(” The background is continuous.”);if(r.background.apReactivity&&r.background.apReactivity!==“Present and symmetric”)bg.push(” Anterior-posterior gradient is “+r.background.apReactivity.toLowerCase()+”.”);L.push(bg.join(””)||“Background not described.”);if(r.background.images&&r.background.images.length)L.push(”  [”+r.background.images.length+” EEG screenshot(s) attached]”);L.push(””);if(r.sleep.captured===“yes”){L.push(“SLEEP:”);L.push(r.sleep.features&&r.sleep.features.length?r.sleep.features.join(”. “)+”.”:“Sleep captured, no features documented.”);L.push(””)}if(r.type===“routine”){L.push(“ACTIVATION PROCEDURES:”);var a=[];a.push(r.activations.hv!==“Not performed”?“Hyperventilation: “+r.activations.hv+”.”:“Hyperventilation was not performed.”);a.push(r.activations.ips!==“Not performed”?“Intermittent photic stimulation: “+r.activations.ips+”.”:“Intermittent photic stimulation was not performed.”);L.push(a.join(” “));L.push(””)}L.push(“EPILEPTIFORM ACTIVITY:”);if(r.epileptiform.present===“yes”&&r.epileptiform.discharges&&r.epileptiform.discharges.length){r.epileptiform.discharges.forEach(function(d,i){var p=[];if(d.frequency)p.push(d.frequency.toLowerCase());if(d.location)p.push(d.location);if(d.morphology)p.push(d.morphology.toLowerCase());if(d.distribution)p.push(“with “+d.distribution.toLowerCase()+” distribution”);L.push(”  “+(i+1)+”. “+(p.join(” “)||“Unspecified discharge”)+”.”)})}else L.push(“No epileptiform discharges are identified.”);if(r.epileptiform.images&&r.epileptiform.images.length)L.push(”  [”+r.epileptiform.images.length+” EEG screenshot(s) attached]”);L.push(””);if(r.periodic.pattern!==“None”||r.rhythmic.pattern!==“None”){L.push(“PERIODIC & RHYTHMIC PATTERNS:”);if(r.periodic.pattern!==“None”){var pl=r.periodic.pattern;if(r.periodic.location)pl+=” at “+r.periodic.location;if(r.periodic.frequency)pl+=”, frequency “+r.periodic.frequency;if(r.periodic.modifier!==“None”)pl+=” “+r.periodic.modifier;L.push(pl+”.”)}if(r.rhythmic.pattern!==“None”){var rl=r.rhythmic.pattern;if(r.rhythmic.location)rl+=” at “+r.rhythmic.location;L.push(rl+”.”)}if(r.periodic.images&&r.periodic.images.length)L.push(”  [”+r.periodic.images.length+” EEG screenshot(s) attached]”);L.push(””)}if(r.focalSlowing.type!==“None”||r.generalizedSlowing.type!==“None”){L.push(“SLOWING:”);if(r.focalSlowing.type!==“None”)L.push(r.focalSlowing.type+(r.focalSlowing.location?” over the “+r.focalSlowing.location+” region”:””)+”.”);if(r.generalizedSlowing.type!==“None”)L.push(r.generalizedSlowing.type+”.”);if(r.focalSlowing.images&&r.focalSlowing.images.length)L.push(”  [”+r.focalSlowing.images.length+” EEG screenshot(s) attached]”);L.push(””)}L.push(“SEIZURES:”);if(r.seizures.present===“yes”&&r.seizures.events&&r.seizures.events.length){r.seizures.events.forEach(function(s,i){var p=[];if(s.type&&!s.type.startsWith(”\u2014”))p.push(“Classification: “+s.type);if(s.onset)p.push(“Onset: “+s.onset);if(s.duration)p.push(“Duration: “+s.duration);if(s.eegPattern)p.push(“EEG pattern: “+s.eegPattern);if(s.evolution&&s.evolution!==“Not applicable”)p.push(“Evolution: “+s.evolution);if(s.ending)p.push(“Ending: “+s.ending);if(s.semiology&&s.semiology!==“No clinical correlate (subclinical)”)p.push(“Semiology: “+s.semiology);if(s.eegDescription)p.push(“Description: “+s.eegDescription);L.push(”  Event “+(i+1)+”: “+p.join(” | “))})}else L.push(“No electrographic seizures are captured during this recording.”);if(r.seizures.images&&r.seizures.images.length)L.push(”  [”+r.seizures.images.length+” EEG screenshot(s) attached]”);L.push(””);if(r.type===“icu”&&r.icuDetails.trendSummary){L.push(“TREND SUMMARY:”);L.push(r.icuDetails.trendSummary);L.push(””)}L.push(“IMPRESSION:”);if(r.impression.classification)L.push(“This is “+(r.impression.classification===“Abnormal”?“an ABNORMAL”:“a NORMAL”)+” “+(r.type===“routine”?“EEG”:r.type===“ltm”?“long-term EEG monitoring study”:“continuous EEG monitoring study”)+”.”);if(r.impression.abnormalities&&r.impression.abnormalities.length)L.push(“Abnormalities include: “+r.impression.abnormalities.join(”, “)+”.”);L.push(””);L.push(“CLINICAL CORRELATION:”);L.push(r.impression.clinicalCorrelation||”***”);if(r.impression.additionalComments){L.push(””);L.push(“ADDITIONAL COMMENTS:”);L.push(r.impression.additionalComments)}return L.join(”\n”)}
+
+function Radio(p){return e(“div”,{style:{display:“flex”,gap:12}},p.options.map(function(v){return e(“label”,{key:v[0],style:sCb},e(“input”,{type:“radio”,name:p.name,checked:p.value===v[0],onChange:function(){p.onChange(v[0])}}),v[1])}))}
+
+function SzCard(p){var s=p.sz;var i=p.idx;return e(“div”,{style:sEC},e(“div”,{style:{display:“flex”,justifyContent:“space-between”,alignItems:“center”,marginBottom:10}},e(“span”,{style:{fontSize:12,fontWeight:600,color:CL.warn}},“Event #”+(i+1)),e(“button”,{style:{padding:“4px 10px”,borderRadius:6,border:“none”,cursor:“pointer”,fontSize:11,background:“rgba(248,113,113,0.12)”,color:CL.err},onClick:function(){p.onRemove(i)}},”\u2715 Remove”)),e(“div”,{style:sR2},e(Fld,{label:“Seizure Classification (ILAE 2017)”},e(Sel,{value:s.type,onChange:function(v){p.onUpdate(i,“type”,v)},options:ACNS.szType})),e(Fld,{label:“EEG Onset Location”},e(Sel,{value:s.onset,onChange:function(v){p.onUpdate(i,“onset”,v)},options:ACNS.szOnset}))),e(“div”,{style:sR3},e(Fld,{label:“Duration”},e(Sel,{value:s.duration,onChange:function(v){p.onUpdate(i,“duration”,v)},options:ACNS.szDur})),e(Fld,{label:“EEG Pattern”},e(Sel,{value:s.eegPattern,onChange:function(v){p.onUpdate(i,“eegPattern”,v)},options:ACNS.szEEG})),e(Fld,{label:“Evolution”},e(Sel,{value:s.evolution,onChange:function(v){p.onUpdate(i,“evolution”,v)},options:ACNS.szEvol}))),e(“div”,{style:sR2},e(Fld,{label:“Seizure Ending”},e(Sel,{value:s.ending,onChange:function(v){p.onUpdate(i,“ending”,v)},options:ACNS.szEnd})),e(Fld,{label:“Semiology”},e(Sel,{value:s.semiology,onChange:function(v){p.onUpdate(i,“semiology”,v)},options:ACNS.szSem}))),e(Fld,{label:“EEG Description”},e(“textarea”,{style:sTa,value:s.eegDescription,onChange:function(ev){p.onUpdate(i,“eegDescription”,ev.target.value)},placeholder:“Describe the ictal EEG pattern…”})))}
+
+function DisCard(p){var d=p.dis;var i=p.idx;return e(“div”,{style:sEC},e(“div”,{style:{display:“flex”,justifyContent:“space-between”,alignItems:“center”,marginBottom:10}},e(“span”,{style:{fontSize:12,fontWeight:600,color:CL.acc}},“Discharge #”+(i+1)),e(“button”,{style:{padding:“4px 10px”,borderRadius:6,border:“none”,cursor:“pointer”,fontSize:11,background:“rgba(248,113,113,0.12)”,color:CL.err},onClick:function(){p.onRemove(i)}},”\u2715 Remove”)),e(“div”,{style:sR2},e(Fld,{label:“Morphology”},e(Sel,{value:d.morphology,onChange:function(v){p.onUpdate(i,“morphology”,v)},options:ACNS.epiMorph})),e(Fld,{label:“Location”},e(Sel,{value:d.location,onChange:function(v){p.onUpdate(i,“location”,v)},options:ACNS.epiLoc}))),e(“div”,{style:sR2},e(Fld,{label:“Frequency”},e(Sel,{value:d.frequency,onChange:function(v){p.onUpdate(i,“frequency”,v)},options:ACNS.epiFreq})),e(Fld,{label:“Distribution”},e(Sel,{value:d.distribution,onChange:function(v){p.onUpdate(i,“distribution”,v)},options:ACNS.epiDist}))))}
+
+function AddBtn(p){return e(“button”,{style:{padding:“6px 14px”,borderRadius:6,border:“1px dashed “+CL.brd,cursor:“pointer”,fontSize:12,background:“transparent”,color:CL.acc},onClick:p.onClick},p.label)}
+
+function Preview(p){var r=p.report;var n=genNarr(r);var secs=n.split(”\n\n”);var allImgs=[].concat((r.background.images||[]).map(function(i){return Object.assign({},i,{section:“Background”})}),(r.epileptiform.images||[]).map(function(i){return Object.assign({},i,{section:“Epileptiform Activity”})}),(r.periodic.images||[]).map(function(i){return Object.assign({},i,{section:“Periodic & Rhythmic Patterns”})}),(r.focalSlowing.images||[]).map(function(i){return Object.assign({},i,{section:“Slowing”})}),(r.seizures.images||[]).map(function(i){return Object.assign({},i,{section:“Seizures / Events”})}));var pF={display:“grid”,gridTemplateColumns:“160px 1fr”,gap:8,marginBottom:4,fontSize:13};var pL={fontWeight:600,color:”#555”};var pH2={fontSize:14,fontWeight:700,margin:“20px 0 8px”,textTransform:“uppercase”,letterSpacing:“0.04em”,borderBottom:“1px solid #ddd”,paddingBottom:4};return e(“div”,{id:“report-preview”,style:{background:”#fff”,color:”#1a1a1a”,borderRadius:12,padding:“40px 48px”,fontFamily:”‘IBM Plex Serif’,Georgia,serif”,fontSize:13,lineHeight:1.7,maxWidth:800,margin:“0 auto”}},e(“div”,{style:{textAlign:“center”,borderBottom:“2px solid #1a1a1a”,paddingBottom:16,marginBottom:24}},e(“div”,{style:{fontSize:11,color:”#888”,textTransform:“uppercase”,letterSpacing:“0.08em”,marginBottom:4}},r.type===“routine”?“Electroencephalogram Report”:r.type===“ltm”?“Long-Term EEG Monitoring Report”:“Continuous EEG Monitoring Report”),e(“div”,{style:{fontSize:18,fontWeight:700}},“EEG REPORT”),e(“div”,{style:{fontSize:11,color:”#888”,marginTop:6}},“ACNS Standardized Terminology”)),r.patient.name?e(“div”,{style:{marginBottom:20,padding:“12px 16px”,background:”#f8f9fa”,borderRadius:8}},e(“div”,{style:pF},e(“span”,{style:pL},“Patient Name:”),e(“span”,null,r.patient.name)),r.patient.sex?e(“div”,{style:pF},e(“span”,{style:pL},“Sex:”),e(“span”,null,r.patient.sex)):null,r.patient.mrn?e(“div”,{style:pF},e(“span”,{style:pL},“MRN:”),e(“span”,null,r.patient.mrn)):null,r.patient.dob?e(“div”,{style:pF},e(“span”,{style:pL},“Date of Birth:”),e(“span”,null,r.patient.dob)):null,r.patient.referringPhysician?e(“div”,{style:pF},e(“span”,{style:pL},“Referring Physician:”),e(“span”,null,r.patient.referringPhysician)):null,r.patient.indication?e(“div”,{style:pF},e(“span”,{style:pL},“Indication:”),e(“span”,null,r.patient.indication)):null):null,secs.map(function(sec,i){var ls=sec.split(”\n”);var isH=ls[0]&&ls[0].slice(-1)===”:”&&ls[0]===ls[0].toUpperCase();return isH?e(“div”,{key:i},e(“div”,{style:pH2},ls[0].replace(”:”,””).replace(”:”,””) ),e(“div”,{style:{whiteSpace:“pre-wrap”}},ls.slice(1).join(”\n”))):e(“div”,{key:i,style:{whiteSpace:“pre-wrap”,marginBottom:8}},sec)}),allImgs.length>0?e(“div”,null,e(“div”,{style:pH2},“EEG SCREENSHOTS”),allImgs.map(function(im,idx){return e(“div”,{key:idx,style:{marginBottom:16,textAlign:“center”}},e(“img”,{src:im.src,style:{maxWidth:“100%”,borderRadius:6,border:“1px solid #ddd”}}),e(“div”,{style:{fontSize:11,color:”#666”,marginTop:4}},e(“em”,null,im.section+(im.caption?” \u2014 “+im.caption:””))))})):null,e(“div”,{style:{marginTop:40,borderTop:“1px solid #ddd”,paddingTop:16,display:“grid”,gridTemplateColumns:“1fr 1fr”,gap:24,fontSize:12,color:”#888”}},e(“div”,null,e(“div”,{style:{fontWeight:600,color:”#555”,marginBottom:4}},“Interpreting Physician”),e(“div”,{style:{borderBottom:“1px solid #ccc”,paddingBottom:24,marginBottom:4}}),e(“div”,null,“Signature / Date”)),e(“div”,null,e(“div”,{style:{fontWeight:600,color:”#555”,marginBottom:4}},“Technologist”),e(“div”,{style:{borderBottom:“1px solid #ccc”,paddingBottom:24,marginBottom:4}}),e(“div”,null,“Signature / Date”))))}
+
+function App() {
+var s1=useState(defReport());var rpt=s1[0];var setRpt=s1[1];
+var s2=useState(“entry”);var view=s2[0];var setView=s2[1];
+var s3=useState(null);var toast=s3[0];var setToast=s3[1];
+
+function showToast(msg){setToast(msg);setTimeout(function(){setToast(null)},2500)}
+
+var u = useCallback(function(path,value){
+setRpt(function(prev){
+var n=JSON.parse(JSON.stringify(prev));
+var k=path.split(”.”);var o=n;
+for(var i=0;i<k.length-1;i++)o=o[k[i]];
+o[k[k.length-1]]=value;return n;
+});
+},[]);
+
+function addDis(){u(“epileptiform.discharges”,rpt.epileptiform.discharges.concat({morphology:””,location:””,frequency:””,distribution:””}))}
+function rmDis(i){u(“epileptiform.discharges”,rpt.epileptiform.discharges.filter(function(*,x){return x!==i}))}
+function upDis(i,f,v){var d=rpt.epileptiform.discharges.slice();d[i]=Object.assign({},d[i]);d[i][f]=v;u(“epileptiform.discharges”,d)}
+function addSz(){u(“seizures.events”,rpt.seizures.events.concat({type:””,onset:””,duration:””,semiology:””,evolution:””,ending:””,eegPattern:””,eegDescription:””}))}
+function rmSz(i){u(“seizures.events”,rpt.seizures.events.filter(function(*,x){return x!==i}))}
+function upSz(i,f,v){var d=rpt.seizures.events.slice();d[i]=Object.assign({},d[i]);d[i][f]=v;u(“seizures.events”,d)}
+
+function doPrint(){var c=document.getElementById(“report-preview”);if(!c)return;var w=window.open(””,”_blank”);w.document.write(’<!DOCTYPE html><html><head><title>EEG Report</title><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;600;700&display=swap" rel="stylesheet"><style>body{font-family:“IBM Plex Serif”,Georgia,serif;margin:40px;color:#1a1a1a;font-size:13px;line-height:1.7}img{max-width:100%;page-break-inside:avoid}@media print{body{margin:20px}}</style></head><body>’+c.innerHTML+’</body></html>’);w.document.close();setTimeout(function(){w.print()},500)}
+
+function doReset(){if(confirm(“Reset all fields?”)){setRpt(defReport())}}
+
+function quickN(){setRpt(function(prev){return Object.assign({},prev,{background:{pdr:“9 Hz \u2014 Alpha”,voltage:“Medium (20-70 \u00B5V)”,symmetry:“Symmetric”,reactivity:“Reactive”,continuity:“Continuous”,apReactivity:“Present and symmetric”,images:prev.background&&prev.background.images||[]},sleep:{captured:“yes”,features:[“Normal sleep transients present”]},activations:{hv:“No change”,ips:“Symmetric photic driving”},epileptiform:{present:“no”,discharges:[],images:prev.epileptiform&&prev.epileptiform.images||[]},periodic:{pattern:“None”,frequency:””,modifier:“None”,location:””,images:prev.periodic&&prev.periodic.images||[]},rhythmic:{pattern:“None”,location:””},focalSlowing:{type:“None”,location:””,images:prev.focalSlowing&&prev.focalSlowing.images||[]},generalizedSlowing:{type:“None”},seizures:{present:“no”,events:[],images:prev.seizures&&prev.seizures.images||[]},impression:{classification:“Normal”,abnormalities:[],clinicalCorrelation:“This is a normal EEG. A normal EEG does not exclude the diagnosis of epilepsy or other intermittent neurological conditions.”,additionalComments:””}})});setView(“narrative”);showToast(“Normal EEG template applied”)}
+
+return e(“div”,{style:{background:CL.bg,minHeight:“100vh”,fontFamily:”‘IBM Plex Sans’,‘SF Pro Display’,-apple-system,sans-serif”,color:CL.txt}},
+e(“div”,{style:{background:“linear-gradient(135deg,”+CL.srf+”,”+CL.sAlt+”)”,borderBottom:“1px solid “+CL.brd,padding:“16px 20px”,display:“flex”,alignItems:“center”,justifyContent:“space-between”,position:“sticky”,top:0,zIndex:100,flexWrap:“wrap”,gap:8}},
+e(“div”,{style:{display:“flex”,alignItems:“center”,gap:12}},
+e(“div”,{style:{width:36,height:36,borderRadius:8,background:“linear-gradient(135deg,”+CL.acc+”,#8B5CF6)”,display:“flex”,alignItems:“center”,justifyContent:“center”,fontSize:18,fontWeight:700,color:”#fff”}},”\u26A1”),
+e(“div”,null,e(“div”,{style:{fontSize:18,fontWeight:600}},“NeuroReport”),e(“div”,{style:{fontSize:11,color:CL.tSec,textTransform:“uppercase”}},“EEG Report Generator”))
+),
+e(“div”,{style:{display:“flex”,gap:8,flexWrap:“wrap”}},
+e(“button”,{style:sBS,onClick:quickN},”\u26A1 Quick Normal”),
+e(“button”,{style:sBS,onClick:doReset},”\u21BA Reset”),
+view===“preview”?e(“button”,{style:sBP,onClick:doPrint},”\uD83D\uDDA8\uFE0F Print / PDF”):null
+)
+),
+e(“div”,{style:{maxWidth:1100,margin:“0 auto”,padding:“20px 16px 60px”}},
+toast?e(“div”,{style:{position:“fixed”,top:72,left:“50%”,transform:“translateX(-50%)”,background:CL.ok,color:”#000”,padding:“10px 24px”,borderRadius:8,fontSize:13,fontWeight:600,zIndex:200}},toast):null,
+e(“div”,{style:{display:“flex”,gap:6,marginBottom:24,flexWrap:“wrap”}},
+[[“routine”,“Routine EEG”],[“ltm”,“LTM / EMU”],[“icu”,“ICU / cEEG”]].map(function(x){return e(“button”,{key:x[0],style:{padding:“8px 20px”,borderRadius:20,border:“1px solid “+(rpt.type===x[0]?CL.acc:CL.brd),cursor:“pointer”,fontSize:13,fontWeight:rpt.type===x[0]?600:400,background:rpt.type===x[0]?CL.aDim:“transparent”,color:rpt.type===x[0]?CL.acc:CL.tSec},onClick:function(){setRpt(function(p){return Object.assign({},p,{type:x[0]})})}},x[1])})
+),
+e(“div”,{style:{display:“flex”,gap:2,background:CL.srf,borderRadius:10,padding:3,marginBottom:20,border:“1px solid “+CL.brd}},
+[[“entry”,”\uD83D\uDCDD Data Entry”],[“narrative”,”\uD83D\uDCC4 Narrative”],[“preview”,”\uD83D\uDC41 Report Preview”]].map(function(x){return e(“button”,{key:x[0],style:{flex:1,padding:“10px 12px”,borderRadius:8,border:“none”,cursor:“pointer”,fontSize:13,fontWeight:view===x[0]?600:400,background:view===x[0]?CL.acc:“transparent”,color:view===x[0]?”#fff”:CL.tSec},onClick:function(){setView(x[0])}},x[1])})
+),
+view===“entry”?e(“div”,null,
+e(Sec,{title:“Patient Information”,defaultOpen:true},
+e(“div”,{style:sR3},e(Fld,{label:“Patient Name”},e(“input”,{style:sInp,value:rpt.patient.name,onChange:function(ev){u(“patient.name”,ev.target.value)},placeholder:“Last, First”})),e(Fld,{label:“MRN”},e(“input”,{style:sInp,value:rpt.patient.mrn,onChange:function(ev){u(“patient.mrn”,ev.target.value)},placeholder:“Medical Record Number”})),e(Fld,{label:“Sex”},e(Sel,{value:rpt.patient.sex,onChange:function(v){u(“patient.sex”,v)},options:ACNS.sex}))),
+e(“div”,{style:sR2},e(Fld,{label:“Date of Birth”},e(“input”,{style:sInp,type:“date”,value:rpt.patient.dob,onChange:function(ev){u(“patient.dob”,ev.target.value)}})),e(Fld,{label:“Referring Physician”},e(“input”,{style:sInp,value:rpt.patient.referringPhysician,onChange:function(ev){u(“patient.referringPhysician”,ev.target.value)}}))),
+e(Fld,{label:“Indication”},e(“input”,{style:sInp,value:rpt.patient.indication,onChange:function(ev){u(“patient.indication”,ev.target.value)},placeholder:“e.g., Evaluation for seizures”})),
+e(Fld,{label:“Relevant History”},e(“textarea”,{style:sTa,value:rpt.patient.relevantHistory,onChange:function(ev){u(“patient.relevantHistory”,ev.target.value)},placeholder:“Brief relevant clinical history…”}))
+),
+e(Sec,{title:“Technical Parameters”,defaultOpen:true},
+e(“div”,{style:sR2},e(Fld,{label:“Recording Duration”},e(Sel,{value:rpt.technical.duration,onChange:function(v){u(“technical.duration”,v)},options:ACNS.recDur})),e(Fld,{label:“Activation Procedures”},e(MSelect,{selected:rpt.technical.activationProcedures,onChange:function(v){u(“technical.activationProcedures”,v)},options:ACNS.actProc}))),
+e(Fld,{label:“Current Medications”},e(MSelect,{selected:rpt.technical.medications,onChange:function(v){u(“technical.medications”,v)},options:ACNS.meds})),
+e(Fld,{label:“Technologist Comments”},e(“textarea”,{style:sTa,value:rpt.technical.techComments,onChange:function(ev){u(“technical.techComments”,ev.target.value)}}))
+),
+rpt.type===“icu”?e(Sec,{title:“ICU / Patient State”,badge:“cEEG”,defaultOpen:true},
+e(“div”,{style:sR2},e(Fld,{label:“Patient State”},e(Sel,{value:rpt.icuDetails.patientState,onChange:function(v){u(“icuDetails.patientState”,v)},options:ACNS.patState})),e(Fld,{label:“Sedation”},e(“input”,{style:sInp,value:rpt.icuDetails.sedation,onChange:function(ev){u(“icuDetails.sedation”,ev.target.value)},placeholder:“e.g., Propofol 50 mcg/kg/min”}))),
+e(Fld,{label:“Stimulation Testing”},e(“textarea”,{style:sTa,value:rpt.icuDetails.stimTesting,onChange:function(ev){u(“icuDetails.stimTesting”,ev.target.value)}})),
+e(Fld,{label:“Trend Summary”},e(“textarea”,{style:Object.assign({},sTa,{minHeight:100}),value:rpt.icuDetails.trendSummary,onChange:function(ev){u(“icuDetails.trendSummary”,ev.target.value)}}))
+):null,
+e(Sec,{title:“Background Activity”,badge:“ACNS”},
+e(“div”,{style:sR2},e(Fld,{label:“Posterior Dominant Rhythm”},e(Sel,{value:rpt.background.pdr,onChange:function(v){u(“background.pdr”,v)},options:ACNS.pdrFrequency})),e(Fld,{label:“Voltage”},e(Sel,{value:rpt.background.voltage,onChange:function(v){u(“background.voltage”,v)},options:ACNS.voltage}))),
+e(“div”,{style:sR3},e(Fld,{label:“Symmetry”},e(Sel,{value:rpt.background.symmetry,onChange:function(v){u(“background.symmetry”,v)},options:ACNS.symmetry})),e(Fld,{label:“Reactivity”},e(Sel,{value:rpt.background.reactivity,onChange:function(v){u(“background.reactivity”,v)},options:ACNS.reactivity})),e(Fld,{label:“Continuity”},e(Sel,{value:rpt.background.continuity,onChange:function(v){u(“background.continuity”,v)},options:ACNS.continuity}))),
+e(Fld,{label:“AP Gradient”},e(Sel,{value:rpt.background.apReactivity,onChange:function(v){u(“background.apReactivity”,v)},options:ACNS.apReactivity})),
+e(ImgAttach,{label:“Background EEG Screenshots”,images:rpt.background.images,onChange:function(v){u(“background.images”,v)}})
+),
+e(Sec,{title:“Sleep Architecture”},
+e(Fld,{label:“Sleep Captured”},e(Radio,{name:“sleep”,value:rpt.sleep.captured,onChange:function(v){u(“sleep.captured”,v)},options:[[“yes”,“Yes”],[“no”,“No”]]})),
+rpt.sleep.captured===“yes”?e(Fld,{label:“Sleep Features”},e(MSelect,{selected:rpt.sleep.features,onChange:function(v){u(“sleep.features”,v)},options:ACNS.sleepArch})):null
+),
+rpt.type===“routine”?e(Sec,{title:“Activation Procedures”},
+e(“div”,{style:sR2},e(Fld,{label:“Hyperventilation”},e(Sel,{value:rpt.activations.hv,onChange:function(v){u(“activations.hv”,v)},options:ACNS.hvResp})),e(Fld,{label:“Intermittent Photic Stimulation”},e(Sel,{value:rpt.activations.ips,onChange:function(v){u(“activations.ips”,v)},options:ACNS.ipsResp})))
+):null,
+e(Sec,{title:“Epileptiform Activity”,badge:“ACNS”},
+e(Fld,{label:“Epileptiform Discharges Present”},e(Radio,{name:“epi”,value:rpt.epileptiform.present,onChange:function(v){u(“epileptiform.present”,v);if(v===“yes”&&!rpt.epileptiform.discharges.length)addDis()},options:[[“yes”,“Yes”],[“no”,“No”]]})),
+rpt.epileptiform.present===“yes”?e(“div”,null,rpt.epileptiform.discharges.map(function(d,i){return e(DisCard,{key:i,dis:d,idx:i,onRemove:rmDis,onUpdate:upDis})}),e(AddBtn,{onClick:addDis,label:”+ Add Discharge”})):null,
+e(ImgAttach,{label:“Epileptiform Activity EEG Screenshots”,images:rpt.epileptiform.images,onChange:function(v){u(“epileptiform.images”,v)}})
+),
+e(Sec,{title:“Periodic & Rhythmic Patterns”,badge:“ACNS”},
+e(“div”,{style:sR2},e(Fld,{label:“Periodic Pattern”},e(Sel,{value:rpt.periodic.pattern,onChange:function(v){u(“periodic.pattern”,v)},options:ACNS.periodicPat})),rpt.periodic.pattern!==“None”?e(Fld,{label:“Frequency”},e(Sel,{value:rpt.periodic.frequency,onChange:function(v){u(“periodic.frequency”,v)},options:ACNS.periodicFreq})):null),
+rpt.periodic.pattern!==“None”?e(“div”,{style:sR2},e(Fld,{label:“Modifier”},e(Sel,{value:rpt.periodic.modifier,onChange:function(v){u(“periodic.modifier”,v)},options:ACNS.periodicMod})),e(Fld,{label:“Location”},e(Sel,{value:rpt.periodic.location,onChange:function(v){u(“periodic.location”,v)},options:ACNS.epiLoc}))):null,
+e(“div”,{style:{marginTop:14,paddingTop:14,borderTop:“1px solid “+CL.brd}},
+e(“div”,{style:sR2},e(Fld,{label:“Rhythmic Pattern”},e(Sel,{value:rpt.rhythmic.pattern,onChange:function(v){u(“rhythmic.pattern”,v)},options:ACNS.rhythmicPat})),rpt.rhythmic.pattern!==“None”?e(Fld,{label:“Location”},e(Sel,{value:rpt.rhythmic.location,onChange:function(v){u(“rhythmic.location”,v)},options:ACNS.slowLoc})):null)
+),
+e(ImgAttach,{label:“Periodic/Rhythmic Pattern EEG Screenshots”,images:rpt.periodic.images,onChange:function(v){u(“periodic.images”,v)}})
+),
+e(Sec,{title:“Slowing”},
+e(“div”,{style:sR2},e(Fld,{label:“Focal Slowing”},e(Sel,{value:rpt.focalSlowing.type,onChange:function(v){u(“focalSlowing.type”,v)},options:ACNS.focalSlow})),rpt.focalSlowing.type!==“None”?e(Fld,{label:“Location”},e(Sel,{value:rpt.focalSlowing.location,onChange:function(v){u(“focalSlowing.location”,v)},options:ACNS.slowLoc})):null),
+e(Fld,{label:“Generalized Slowing”},e(Sel,{value:rpt.generalizedSlowing.type,onChange:function(v){u(“generalizedSlowing.type”,v)},options:ACNS.genSlow})),
+e(ImgAttach,{label:“Slowing EEG Screenshots”,images:rpt.focalSlowing.images,onChange:function(v){u(“focalSlowing.images”,v)}})
+),
+e(Sec,{title:“Seizures / Events”,badge:“ILAE 2017”},
+e(Fld,{label:“Seizures Captured”},e(Radio,{name:“sz”,value:rpt.seizures.present,onChange:function(v){u(“seizures.present”,v);if(v===“yes”&&!rpt.seizures.events.length)addSz()},options:[[“yes”,“Yes”],[“no”,“No”]]})),
+rpt.seizures.present===“yes”?e(“div”,null,rpt.seizures.events.map(function(s,i){return e(SzCard,{key:i,sz:s,idx:i,onRemove:rmSz,onUpdate:upSz})}),e(AddBtn,{onClick:addSz,label:”+ Add Seizure Event”})):null,
+e(ImgAttach,{label:“Seizure / Event EEG Screenshots”,images:rpt.seizures.images,onChange:function(v){u(“seizures.images”,v)}})
+),
+e(Sec,{title:“Impression & Clinical Correlation”,defaultOpen:true},
+e(Fld,{label:“Overall Classification”},e(Radio,{name:“imp”,value:rpt.impression.classification,onChange:function(v){u(“impression.classification”,v)},options:[[“Normal”,“Normal”],[“Abnormal”,“Abnormal”]]})),
+rpt.impression.classification===“Abnormal”?e(Fld,{label:“Abnormalities”},e(MSelect,{selected:rpt.impression.abnormalities,onChange:function(v){u(“impression.abnormalities”,v)},options:ACNS.abnType})):null,
+e(Fld,{label:“Clinical Correlation”},e(“textarea”,{style:Object.assign({},sTa,{minHeight:80}),value:rpt.impression.clinicalCorrelation,onChange:function(ev){u(“impression.clinicalCorrelation”,ev.target.value)},placeholder:“Provide clinical correlation and interpretation…”})),
+e(Fld,{label:“Additional Comments”},e(“textarea”,{style:sTa,value:rpt.impression.additionalComments,onChange:function(ev){u(“impression.additionalComments”,ev.target.value)}}))
+)
+):null,
+view===“narrative”?e(“div”,null,
+e(“div”,{style:{marginBottom:12,display:“flex”,justifyContent:“space-between”,alignItems:“center”}},e(“span”,{style:{fontSize:13,color:CL.tSec}},“Auto-generated from structured data”),e(“button”,{style:sBS,onClick:function(){navigator.clipboard.writeText(genNarr(rpt))}},”\uD83D\uDCCB Copy”)),
+e(“div”,{style:{background:CL.sBg,border:“1px solid “+CL.brd,borderRadius:12,padding:“20px 24px”,whiteSpace:“pre-wrap”,fontSize:13.5,lineHeight:1.75,color:CL.txt,fontFamily:”‘IBM Plex Serif’,Georgia,serif”}},genNarr(rpt))
+):null,
+view===“preview”?e(“div”,null,
+e(“div”,{style:{marginBottom:12,display:“flex”,justifyContent:“space-between”,alignItems:“center”}},e(“span”,{style:{fontSize:13,color:CL.tSec}},“Formatted report preview”),e(“button”,{style:sBP,onClick:doPrint},”\uD83D\uDDA8\uFE0F Print / PDF”)),
+e(Preview,{report:rpt})
+):null
+)
+);
+}
+
+ReactDOM.createRoot(document.getElementById(“root”)).render(e(App));
+</script>
+
+</body>
+</html>
